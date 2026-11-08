@@ -815,6 +815,7 @@ const fmtDate = d => d.toLocaleDateString("en-GB", { weekday: "short", day: "num
 const newDraft = () => ({
   text: "",
   audioDuration: null,   // seconds of recorded audio, kept alongside the words
+  audio: [],             // real recordings (object URLs), played back in order
   photo: null,           // object URL
   place: null,
   chapter: null,
@@ -1375,30 +1376,53 @@ function playFirstRun(entryId) {
       { duration: 260, easing: EASE_OUT, delay: 150, fill: "backwards" }, [{ opacity: 0 }, { opacity: 1 }]));
 }
 
-// Simulated playback on a card's audio bar
+// Playback on a card's audio bar: real recordings play through an <audio> element;
+// seeded entries (no recording) simulate the timer.
+const player = new Audio();
+player.preload = "auto";
+function refreshBar(e) {
+  const bar = document.getElementById(`audio-${e.id}`);
+  if (bar) bar.outerHTML = audioBar(e);
+}
 function togglePlay(id) {
   const p = state.playing;
   stopPlayback();
   if (p && p.id === id) return;
   const e = [...state.entries, ...OTHERS].find(x => String(x.id) === String(id));
   if (!e) return;
-  state.playing = { id: e.id, elapsed: 0, timer: setInterval(() => {
-    state.playing.elapsed++;
-    if (state.playing.elapsed >= e.audioDuration) { stopPlayback(); return; }
-    const bar = document.getElementById(`audio-${e.id}`);
-    if (bar) bar.outerHTML = audioBar(e);
-  }, 1000) };
-  const bar = document.getElementById(`audio-${e.id}`);
-  if (bar) bar.outerHTML = audioBar(e);
+  const clips = e.audio || [];
+  state.playing = { id: e.id, elapsed: 0 };
+  if (clips.length) {
+    let i = 0, offset = 0;
+    const playClip = () => { player.src = clips[i]; player.play().catch(() => stopPlayback()); };
+    player.onended = () => {
+      offset += e.audioClipSecs ? e.audioClipSecs[i] : 0;
+      if (++i < clips.length) playClip(); else stopPlayback();
+    };
+    player.ontimeupdate = () => {
+      if (!state.playing || state.playing.id !== e.id) return;
+      const t = Math.floor(offset + player.currentTime);
+      if (t !== state.playing.elapsed) { state.playing.elapsed = t; refreshBar(e); }
+    };
+    playClip();
+  } else {
+    state.playing.timer = setInterval(() => {
+      state.playing.elapsed++;
+      if (state.playing.elapsed >= e.audioDuration) { stopPlayback(); return; }
+      refreshBar(e);
+    }, 1000);
+  }
+  refreshBar(e);
 }
 function stopPlayback() {
   const p = state.playing;
   if (!p) return;
   clearInterval(p.timer);
+  player.onended = player.ontimeupdate = null;
+  player.pause();
   state.playing = null;
   const e = [...state.entries, ...OTHERS].find(x => x.id === p.id);
-  const bar = document.getElementById(`audio-${p.id}`);
-  if (e && bar) bar.outerHTML = audioBar(e);
+  if (e) refreshBar(e);
 }
 
 const screens = {};
@@ -1785,25 +1809,94 @@ function pickPlace(name) {
   Sheet.close();
 }
 
-/* --- Recording (simulated speech-to-text) --- */
-function startRecording() {
+/* --- Recording ---
+   Real microphone audio (MediaRecorder) with a live level meter. Where the browser offers speech
+   recognition the words appear as you speak; otherwise the recording is kept without words.
+   If the mic isn't available at all (e.g. opened from a file), it falls back to the simulation. */
+const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder && window.isSecureContext);
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+async function startRecording() {
   const c = state.capture, ta = $("entry-text");
+  if (c.rec || c.starting) return;
   state.draft.text = ta.value;
-  c.rec = { started: Date.now(), elapsed: 0, base: state.draft.text, words: [] };
+  let stream = null;
+  if (canRecord) {
+    c.starting = true;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (err) {
+      c.starting = false;
+      toast(err && err.name === "NotAllowedError" ? "Allow microphone access to record" : "Couldn't start the microphone");
+      return;
+    }
+    c.starting = false;
+    if (!$("entry-text")) { stream.getTracks().forEach(t => t.stop()); return; }   // left the screen meanwhile
+  }
+
+  c.rec = { started: Date.now(), elapsed: 0, base: state.draft.text, words: [], stream, chunks: [], live: !!stream };
+  const rec = c.rec;
   ta.hidden = true;
   $("live-text").hidden = false;
   updateLive();
   renderTools(); renderAddButton();
 
-  c.rec.wordTimer = setInterval(() => {
-    c.rec.words.push(SPEECH[c.speechPos % SPEECH.length]);
-    c.speechPos++;
-    updateLive();
-  }, 380);
-  c.rec.tick = setInterval(() => {
-    c.rec.elapsed = Math.floor((Date.now() - c.rec.started) / 1000);
-    $("rec-time").textContent = fmtTime(c.rec.elapsed);
-    const level = () => (0.25 + Math.random() * 0.75).toFixed(2);
+  if (stream) {
+    // Audio
+    rec.recorder = new MediaRecorder(stream);
+    rec.recorder.ondataavailable = ev => { if (ev.data && ev.data.size) rec.chunks.push(ev.data); };
+    rec.recorder.start();
+    // Level meter
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      rec.ctx = new AC();
+      rec.analyser = rec.ctx.createAnalyser();
+      rec.analyser.fftSize = 512;
+      rec.ctx.createMediaStreamSource(stream).connect(rec.analyser);
+      rec.levels = new Uint8Array(rec.analyser.fftSize);
+    } catch (_) {}
+    // Words
+    if (Speech) {
+      let finalText = "";
+      const listen = () => {
+        if (state.capture.rec !== rec) return;
+        const sr = new Speech();
+        sr.lang = "en-IE"; sr.continuous = true; sr.interimResults = true;
+        sr.onresult = ev => {
+          let interim = "";
+          for (let i = ev.resultIndex; i < ev.results.length; i++) {
+            const r = ev.results[i];
+            if (r.isFinal) finalText += r[0].transcript + " ";
+            else interim += r[0].transcript;
+          }
+          rec.words = (finalText + interim).trim().split(/\s+/).filter(Boolean);
+          if (state.capture.rec === rec) updateLive();
+        };
+        sr.onerror = ev => { if (ev.error === "not-allowed" || ev.error === "service-not-allowed") rec.noSpeech = true; };
+        sr.onend = () => { if (!rec.noSpeech) setTimeout(listen, 50); };   // Safari stops after pauses; pick up again
+        rec.sr = sr;
+        try { sr.start(); } catch (_) {}
+      };
+      listen();
+    }
+  } else {
+    rec.wordTimer = setInterval(() => {
+      rec.words.push(SPEECH[c.speechPos % SPEECH.length]);
+      c.speechPos++;
+      updateLive();
+    }, 380);
+  }
+
+  rec.tick = setInterval(() => {
+    rec.elapsed = Math.floor((Date.now() - rec.started) / 1000);
+    const t = $("rec-time"); if (t) t.textContent = fmtTime(rec.elapsed);
+    let base = null;
+    if (rec.analyser) {
+      rec.analyser.getByteTimeDomainData(rec.levels);
+      let sum = 0;
+      for (const v of rec.levels) sum += ((v - 128) / 128) ** 2;
+      base = Math.min(1, Math.sqrt(sum / rec.levels.length) * 6);
+    }
+    const level = () => (base === null ? 0.25 + Math.random() * 0.75 : 0.15 + base * (0.55 + Math.random() * 0.45)).toFixed(2);
     document.querySelectorAll("#meter i").forEach(b => {
       if (reduceMotion.matches) b.style.opacity = level();       // no transforms with reduced motion
       else b.style.transform = `scaleY(${level()})`;
@@ -1829,12 +1922,26 @@ function stopRecording() {
   if (!rec) return;
   clearInterval(rec.wordTimer); clearInterval(rec.tick);
   const secs = Math.max(1, Math.round((Date.now() - rec.started) / 1000));
-  state.draft.text = spokenText(rec);                               // tapping mic again appends
-  state.draft.audioDuration = (state.draft.audioDuration || 0) + secs;
+  if (rec.sr) { rec.noSpeech = true; try { rec.sr.stop(); } catch (_) {} }
+  if (rec.ctx) rec.ctx.close().catch(() => {});
+  const draft = state.draft;
+  if (rec.recorder && rec.recorder.state !== "inactive") {
+    rec.recorder.onstop = () => {
+      rec.stream.getTracks().forEach(t => t.stop());
+      if (!rec.chunks.length) return;
+      const blob = new Blob(rec.chunks, { type: rec.recorder.mimeType || rec.chunks[0].type });
+      const t = draft.savedAs || draft;   // if Add Moment was tapped before the clip finished, it goes on the saved entry
+      t.audio = [...(t.audio || []), URL.createObjectURL(blob)];
+      t.audioClipSecs = [...(t.audioClipSecs || []), secs];
+    };
+    rec.recorder.stop();
+  } else if (rec.stream) rec.stream.getTracks().forEach(t => t.stop());
+  draft.text = spokenText(rec);                               // tapping mic again appends
+  draft.audioDuration = (draft.audioDuration || 0) + secs;
   c.rec = null;
   const ta = $("entry-text");
   if (!ta) return;                                                 // navigated away mid-recording
-  ta.value = state.draft.text;
+  ta.value = draft.text;
   ta.hidden = false;
   $("live-text").hidden = true;
   autosize(ta);
@@ -1847,7 +1954,9 @@ function addMoment() {
   const d = state.draft;
   d.text = $("entry-text").value.trim();
   if (!d.text && !d.audioDuration && !d.photo && !d.place) { $("entry-text").focus(); return; }
-  state.entries.unshift({ ...d, id: state.nextId++, own: true, createdAt: new Date() });
+  const entry = { ...d, id: state.nextId++, own: true, createdAt: new Date() };
+  d.savedAs = entry;
+  state.entries.unshift(entry);
   state.draft = newDraft();
   state.capture.naming = false;
   if (state.firstRun === "pending") {
@@ -2303,7 +2412,7 @@ const ACTIONS = {
   "pick-place":   v => pickPlace(v),
   "remove-photo": () => { URL.revokeObjectURL(state.draft.photo); state.draft.photo = null; renderAttachments(); renderTools(); },
   "remove-place": () => { state.draft.place = null; renderAttachments(); renderTools(); },
-  "remove-audio": () => { state.draft.audioDuration = null; renderAttachments(); renderTools(); },  // words stay
+  "remove-audio": () => { state.draft.audioDuration = null; state.draft.audio = []; state.draft.audioClipSecs = []; renderAttachments(); renderTools(); },  // words stay
   "chapter-start":   () => startChapter(),
   "chapter-confirm": () => confirmChapter(),
   "chapter-cancel":  () => cancelChapter(),
