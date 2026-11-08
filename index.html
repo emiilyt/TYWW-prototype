@@ -1,0 +1,2337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFFFF">
+<title>The Year We Were</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap" rel="stylesheet">
+<style>
+/* ============ Tokens ============ */
+:root {
+  --page: #FFFFFF;
+  --card: #F4F2DA;          /* entry cards, prompt cards, toggle track, inputs */
+  --surface-strong: #E8E4BA;/* audio player bar, active tab pill, chips */
+  --line: #DCDAD4;          /* dividers, input borders, outlined buttons */
+  --accent-line: #D8D296;   /* border on prompt + opened-prediction cards */
+  --ink: #1C1B19;           /* text, dark buttons */
+  --ink-2: #55524C;         /* secondary text */
+  --meta: #8C877F;          /* dates, counts, attribution */
+  --accent: #66602F;        /* opened, active */
+  --record: #BF2E53;        /* recording stop button only */
+
+  --shadow-card: 0 1px 2px rgba(28,27,25,0.05), 0 2px 8px rgba(28,27,25,0.04);
+  --shadow-raised: 0 1px 2px rgba(36,31,26,0.06);   /* Figma "elevation-1 · Raised": entry cards, month cells */
+  --shadow-pill: 0 1px 3px rgba(28,27,25,0.08), 0 4px 12px rgba(28,27,25,0.06);
+
+  --serif: "Source Serif 4", Georgia, serif;
+  --sans: "Source Sans 3", "Source Sans Pro", -apple-system, system-ui, sans-serif;
+
+  --r-card: 10px;
+  --r-pill: 999px;
+  --tap: 44px;
+  --gutter: 24px;
+  --max-w: 430px;
+}
+
+/* ============ Base ============ */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, p, ul { margin: 0; }
+ul { padding: 0; list-style: none; }
+svg { display: block; flex-shrink: 0; }
+[hidden] { display: none !important; }
+.serif { font-family: var(--serif); font-weight: 600; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ============ App frame ============ */
+.app { max-width: var(--max-w); margin: 0 auto; }
+/* Screens stack in one grid cell so two can overlap during a transition — no absolute positioning */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr); overflow-x: hidden; overflow-x: clip; }
+.layer {
+  grid-area: 1 / 1;
+  min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  background: var(--page);
+}
+.layer.moving { box-shadow: -12px 0 32px rgba(28,27,25,0.10); }
+.screen { flex: 1; display: flex; flex-direction: column; }
+
+/* Dock: sticks to the bottom, holds per-screen floating actions + the tab bar */
+.dock { position: sticky; bottom: 0; z-index: 10; pointer-events: none; }
+.dock > * { pointer-events: auto; }
+/* Floating actions overlap the end of the content (negative margin, not positioning)
+   so the screen's content — like the timeline spine — runs down to the tab bar */
+.dock-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  height: 64px;
+  margin-top: -64px;
+  padding: 0 var(--gutter) 16px;
+  pointer-events: none;
+}
+.dock-actions > * { pointer-events: auto; }
+.dock-actions:empty { display: none; }
+
+/* ============ Tab bar ============ */
+.tabbar {
+  background: var(--page);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+.tab {
+  flex: 1 1 0;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-2);
+  font-size: 11px;
+  line-height: 12px;
+  font-weight: 600;
+}
+.tab-icon { display: flex; align-items: center; justify-content: center; padding: 6px 12px; border-radius: var(--r-pill); }
+.tab[aria-current="page"] { color: var(--ink); }
+.tab[aria-current="page"] .tab-icon { background: var(--surface-strong); }
+.tab-add { flex: 1 1 0; display: flex; justify-content: center; }
+.tab-add .btn-dark { width: 56px; height: 56px; }
+
+/* ============ Buttons ============ */
+.btn-dark, .btn-white {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border-radius: var(--r-pill);
+  font-size: 14px;
+  line-height: 15px;
+  font-weight: 600;
+}
+/* Button press: 100ms scale(0.97). Disabled fades by opacity. */
+button, .btn-dark, .btn-white, .tab { transition: transform 100ms ease-out, opacity 180ms ease; }
+:is(button, .btn-dark, .btn-white, .tab):active:not(:disabled) { transform: scale(0.97); }
+.btn-dark { background: var(--ink); color: #FFFFFF; box-shadow: var(--shadow-pill); }
+.btn-white { background: var(--page); color: var(--ink); box-shadow: var(--shadow-pill); }
+.btn-round { width: 48px; height: 48px; padding: 0; }
+.btn-pill { height: 48px; padding: 8px 12px 8px 16px; }
+.btn-chip { padding: 0 14px 0 12px; }
+.btn-block { width: 100%; min-height: 70px; font-size: 20px; line-height: 18px; box-shadow: none; }
+.btn-dark:disabled { opacity: 0.35; cursor: not-allowed; }
+.link { min-height: var(--tap); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; align-self: flex-start; }
+
+/* ============ Header ============ */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px var(--gutter); }
+.wordmark { font-size: 24px; line-height: 28px; }
+
+/* Segmented toggle */
+.segment-wrap { display: flex; justify-content: center; padding: 0 var(--gutter); }
+.segment { display: flex; gap: 4px; padding: 4px; background: var(--card); border-radius: var(--r-pill); }
+.segment button {
+  min-width: 87px; min-height: var(--tap); padding: 8px 12px;
+  border-radius: var(--r-pill); font-size: 16px; line-height: 18px; font-weight: 600;
+}
+.segment button[aria-pressed="true"] { background: var(--ink); color: #FFFFFF; box-shadow: var(--shadow-pill); }
+
+/* Title row */
+.title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 16px var(--gutter); }
+.title-block { display: flex; flex-direction: column; gap: 8px; }
+.h2 { font-size: 32px; line-height: 36px; }
+.viewby { display: flex; align-items: center; gap: 8px; }
+.viewby-label { font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); }
+
+/* In-place menu (∨) */
+.menu-anchor { position: relative; }
+.menu {
+  position: absolute; /* popover only — anchored to its trigger */
+  top: calc(100% + 6px); left: 0; z-index: 20;
+  min-width: 140px; padding: 6px;
+  background: var(--page); border: 1px solid var(--line); border-radius: var(--r-card); box-shadow: var(--shadow-pill);
+  display: flex; flex-direction: column;
+}
+.menu button {
+  min-height: var(--tap); padding: 0 12px; border-radius: 8px; text-align: left;
+  font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
+}
+.menu button[aria-checked="true"] { color: var(--accent); background: var(--card); }
+.chev { transition: transform 180ms ease; }
+[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+/* ============ Timeline ============ */
+.empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 24px var(--gutter) 32px; text-align: center; color: var(--ink-2);
+}
+.empty-art { width: 203px; max-width: 60%; height: auto; margin-bottom: 4px; }
+.empty-title { font-size: 24px; line-height: 28px; }
+.empty-body { font-size: 18px; line-height: 22px; font-weight: 600; max-width: 260px; }
+
+/* Timeline: date column | spine | cards. The spine spans every row of the grid. */
+.tl {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 50px 10px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 8px;
+  padding: 8px var(--gutter) 0;
+}
+/* Leaves room so the last card can scroll clear of the filter button */
+.tl::after { content: ""; grid-column: 3; height: 72px; }
+.tl-spine { grid-column: 2; grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; transform-origin: bottom; }
+.tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ink); flex-shrink: 0; }
+.tl-line { flex: 1; width: 2px; background: var(--ink); }
+.tl-date { grid-column: 1; align-self: center; text-align: right; white-space: nowrap; font-size: 16px; line-height: 18px; font-weight: 600; color: var(--ink-2); }
+.tl-cell { grid-column: 3; min-width: 0; }
+
+/* ===== Month view: one continuous scroll of months, newest first ===== */
+.months { padding: 8px var(--gutter) 0; }
+.months::after { content: ""; display: block; height: 72px; }   /* clear of the filter button */
+.month { display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 10px; }
+/* Rail: the spine runs down every month's rail, so it reads as one line */
+.month-rail { display: flex; flex-direction: column; align-items: center; background: linear-gradient(var(--ink), var(--ink)) center / 2px 100% no-repeat; }
+.month:first-child .month-rail::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); flex-shrink: 0; }
+/* The month label sticks to the left edge while its grid passes */
+.month-label {
+  position: sticky; top: calc(12px + env(safe-area-inset-top));
+  margin: 0; padding: 8px 4px; border-radius: 4px;
+  background: var(--ink-2); color: #FFFFFF;
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 15px; line-height: 18px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.month-body { display: flex; flex-direction: column; gap: 4px; padding: 4px 0 40px; min-width: 0; }
+.grid-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-height: 18px; }
+.grid-title { font-size: 16px; line-height: 18px; color: var(--ink); }
+.grid-count { margin-left: auto; font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); }
+.weekdays, .mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.weekdays { font-family: var(--serif); font-weight: 600; font-size: 18px; line-height: 20px; color: var(--ink-2); text-align: center; padding-top: 4px; }
+.cell {
+  height: 63px; padding: 4px; border-radius: 4px;
+  display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+  background: var(--heat-bg); color: var(--heat-fg); text-align: left;
+  box-shadow: var(--shadow-raised);
+}
+.cell-date { font-family: var(--serif); font-weight: 600; font-size: 16px; line-height: 18px; }
+.cell-count { font-size: 11px; line-height: 12px; font-weight: 600; }
+.cell.outside { background: #FEFFF8; box-shadow: none; }   /* flat: not part of the month */
+.cell.texture { height: 22px; padding: 0; }         /* public grid in Both: a texture, no numbers */
+.grid-gap { height: 16px; }
+.legend { display: flex; align-items: center; gap: 6px; padding-top: 4px; font-size: 11px; line-height: 12px; font-weight: 600; color: var(--ink-2); }
+.legend-swatches { display: flex; gap: 2px; }
+.legend-swatches i { width: 21px; height: 10px; border-radius: var(--r-pill); background: var(--sw); }
+
+/* Day screen (opened from a month cell) */
+.day-head { display: flex; align-items: center; gap: 16px; padding: 16px var(--gutter) 8px; }
+.day-title { font-size: 24px; line-height: 28px; }
+.day-summary { padding: 8px var(--gutter) 4px; font-size: 14px; line-height: 18px; font-weight: 600; color: var(--ink-2); }
+.day-empty { padding: 24px var(--gutter); color: var(--meta); font-size: 16px; }
+
+/* ===== Both — day view: one sideways timeline. Each day is a column; the line runs through them all. ===== */
+.band {
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory; scroll-padding-left: 16px;
+  scrollbar-width: none;
+  padding: 8px 0 88px;                                   /* bottom: clear of the filter button */
+}
+.band::-webkit-scrollbar { display: none; }
+.band-grid {
+  display: grid;
+  grid-template-rows: auto auto auto auto auto;         /* heading · your cards · line · heading · public cards */
+  grid-auto-columns: max-content;
+  width: max-content;
+  padding-left: 16px;
+}
+/* Every cell in a day leaves room before the next day; the line cell doesn't, so the line never breaks */
+.bc { padding-right: 32px; min-width: 0; }
+.bc-head { padding-top: 4px; padding-bottom: 12px; }
+.bc-head:nth-child(5n + 4) { padding-top: 14px; }       /* "Similar moments" sits a little below the line */
+.bc-row { display: flex; align-items: stretch; gap: 10px; }
+/* Headings and the date stay pinned to the left edge while their day passes, then get pushed off */
+.stick { position: sticky; left: 16px; display: inline-block; max-width: calc(100vw - 32px); }
+.both-title { font-size: 24px; line-height: 28px; color: var(--ink); white-space: nowrap; }
+.both-title small { font-size: 16px; line-height: 18px; }
+.both-sub { font-size: 14px; line-height: 17px; font-weight: 600; color: var(--ink-2); max-width: 300px; padding-top: 4px; }
+.both-none { flex: 0 0 270px; align-self: center; font-size: 14px; line-height: 18px; color: var(--meta); padding: 12px 0; }
+/* Fixed 270px cards so the next one peeks in, snapping to each card's start */
+.bc-row > .entry-card { flex: 0 0 270px; scroll-snap-align: start; }
+.bc-row .card-title { -webkit-line-clamp: 3; }
+.bc-row .card-meta { margin-top: auto; }
+/* The last item in the public row is an action, not content: the dark "View Full Timeline" pill
+   (Figma Primary Button), centred against the cards */
+.bc-row > .view-full {
+  flex: 0 0 auto; align-self: center; scroll-snap-align: start;
+  min-height: var(--tap); padding: 12px 18px;
+  font-size: 16px; line-height: 18px; white-space: nowrap; box-shadow: none;
+}
+/* The timeline line, horizontal: drawn through every day's line cell edge to edge */
+.bc-line { display: flex; align-items: center; padding: 14px 32px 0 0;   /* end spacing like the other cells: the line (a background) still runs through it, and the date gets fully pushed off as its day ends */ background: linear-gradient(var(--ink), var(--ink)) 0 calc(50% + 7px) / 100% 2px no-repeat; }
+.bc-line.first::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); flex-shrink: 0; margin-right: 18px; }
+.dm-label { padding: 4px 6px; border-radius: 4px; background: var(--ink-2); color: #FFFFFF; font-size: 16px; line-height: 20px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
+.bc-line .dm-label.stick { left: 16px; }
+
+/* Entry card: renders whatever the entry has. Bounded height: chip, 2-line text, fixed photo, one-row audio, meta. */
+.entry-card {
+  background: var(--card); border-radius: 4px; box-shadow: var(--shadow-raised);
+  padding: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  cursor: pointer; overflow: hidden;
+}
+.card-chapter { padding: 4px 8px; border-radius: var(--r-pill); background: var(--page); border: 1px solid var(--accent); font-size: 11px; line-height: 12px; font-weight: 600; color: var(--ink-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-head { width: 100%; display: flex; align-items: flex-start; gap: 8px; }
+.card-title {
+  flex: 1; min-width: 0; font-size: 14px; line-height: 17px; font-weight: 600; color: var(--ink);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.card-go { color: var(--ink); margin-top: -4px; }
+.card-photo { width: 100%; height: 45px; border-radius: 2px; background: var(--surface-strong); color: var(--ink); display: flex; align-items: center; justify-content: center; }
+.card-audio { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px 0 0; border-radius: 2px; background: var(--surface-strong); color: var(--ink); }
+.card-bookmark { width: var(--tap); height: var(--tap); margin: -10px 0 -12px -10px; display: flex; align-items: center; justify-content: center; color: var(--ink); }
+.card-bookmark[aria-pressed="true"] { color: var(--accent); }
+.card-shared { display: flex; align-items: center; gap: 4px; font-size: 11px; line-height: 12px; font-weight: 600; color: var(--ink-2); }
+.card-play { width: var(--tap); height: var(--tap); margin: -5px -10px -5px -4px; display: flex; align-items: center; justify-content: center; }
+.wave { display: flex; align-items: center; gap: 2px; height: 26px; }
+.wave i { width: 4px; border-radius: var(--r-pill); background: var(--accent); }
+.card-dur { font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 28px; }
+.card-meta { font-size: 11px; line-height: 12px; font-weight: 600; color: var(--ink-2); }
+
+/* ============ Capture ============ */
+.capture {
+  flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
+  padding: 8px var(--gutter) calc(24px + env(safe-area-inset-bottom));
+}
+.capture-main { display: flex; flex-direction: column; gap: 16px; }
+.capture-nav { display: flex; align-items: center; justify-content: space-between; }
+.capture-date { font-size: 14px; line-height: 15px; font-weight: 600; }
+.prompt { display: flex; flex-direction: column; gap: 4px; }
+.prompt .h2 { max-width: 320px; }
+
+/* Composer: text → attachments → buttons */
+.composer {
+  min-height: 202px;
+  display: flex; flex-direction: column;
+  border: 1.5px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--page);
+}
+.composer-body { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding-bottom: 12px; }
+.composer-text {
+  display: block; width: 100%; min-height: 72px;
+  border: 0; padding: 0; margin: 0; resize: none; overflow: hidden; background: transparent;
+  font-size: 16px; line-height: 20px; font-weight: 600; color: var(--ink);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.composer-text:focus { outline: none; }
+.composer-text::placeholder { color: var(--ink-2); opacity: 1; }
+.interim { color: var(--meta); }
+.caret { display: inline-block; width: 1.5px; height: 1.1em; margin-left: 1px; vertical-align: text-bottom; background: var(--ink); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.composer-tools { border-top: 1px solid var(--line); padding-top: 8px; display: flex; align-items: center; min-height: 56px; }
+.tools-row { display: flex; align-items: center; gap: 8px; }
+.rec-row { flex: 1; display: flex; align-items: center; justify-content: space-between; }
+
+/* Attachments row */
+.attachments { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Photo: 48px tile, badge overlaps its top-right corner by 12px (54px total width) */
+.thumb { display: flex; align-items: flex-start; }
+.thumb-tile { width: 48px; height: 48px; border-radius: 4px; background: var(--surface-strong); color: var(--ink); display: flex; align-items: center; justify-content: center; }
+/* 44px hit area; the 18px circle sits at its centre, negative margins place it on the corner */
+.thumb-x { width: var(--tap); height: var(--tap); margin: -13px -13px -13px -25px; display: flex; align-items: center; justify-content: center; }
+.thumb-x span { width: 18px; height: 18px; border-radius: 50%; background: var(--ink); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap);
+  padding-left: 8px; border-radius: var(--r-pill);
+  background: var(--surface-strong); color: var(--ink-2);
+  font-size: 14px; line-height: 15px; font-weight: 600;
+}
+.chip-x { width: 36px; height: var(--tap); display: flex; align-items: center; justify-content: center; }
+.chip-x span { width: 24px; height: 24px; border-radius: 50%; background: var(--page); color: var(--ink); display: flex; align-items: center; justify-content: center; }
+
+/* Recording */
+.rec-left { display: flex; align-items: center; gap: 16px; }
+.btn-stop { width: 48px; height: 48px; border-radius: var(--r-pill); background: var(--record); box-shadow: var(--shadow-pill); display: flex; align-items: center; justify-content: center; }
+.btn-stop span { width: 13px; height: 13px; background: #FFFFFF; border-radius: 1px; }
+.meter { display: flex; align-items: center; gap: 2px; height: 26px; }
+.meter i { width: 4px; height: 26px; border-radius: var(--r-pill); background: var(--meta); transform-origin: center; transition: transform .12s ease; }
+.rec-time { font-size: 16px; line-height: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Form groups */
+.group { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.group-label { font-size: 18px; line-height: 22px; font-weight: 600; }
+
+/* Chapter */
+.chapter-pill { display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); padding-left: 12px; border-radius: var(--r-pill); background: var(--surface-strong); color: var(--ink-2); font-size: 14px; font-weight: 600; }
+.chapter-edit { display: flex; align-items: flex-end; gap: 12px; width: 100%; }
+.text-field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.text-field label { font-size: 14px; line-height: 15px; font-weight: 600; padding-left: 2px; }
+.text-field input {
+  width: 100%; height: 56px; padding: 0 12px;
+  background: var(--card); border: 2px solid var(--line); border-radius: 8px;
+  font-size: 16px; font-weight: 600;
+}
+.text-field input:focus { outline: none; border-color: var(--ink); }
+.chapter-actions { display: flex; gap: 8px; padding-bottom: 4px; }
+
+/* Switch */
+.switch { min-width: var(--tap); min-height: var(--tap); display: inline-flex; align-items: center; }
+/* Colour changes are cross-fades of stacked layers (opacity), knob moves by transform */
+.switch-track { width: 40px; height: 24px; border-radius: var(--r-pill); background: var(--ink); padding: 3px; display: grid; }
+.switch-track::before { content: ""; grid-area: 1 / 1; margin: -3px; border-radius: inherit; background: var(--surface-strong); opacity: 0; transition: opacity 180ms ease; }
+.switch-knob { grid-area: 1 / 1; width: 18px; height: 18px; border-radius: 50%; background: #FFFFFF; display: grid; transition: transform 180ms cubic-bezier(0.32,0.72,0,1); }
+.switch-knob::after { content: ""; border-radius: 50%; background: var(--ink); opacity: 0; transition: opacity 180ms ease; }
+.switch[aria-checked="true"] .switch-track::before,
+.switch[aria-checked="true"] .switch-knob::after { opacity: 1; }
+.switch[aria-checked="true"] .switch-knob { transform: translateX(16px); }
+
+/* Attribution choice */
+.choice { display: flex; gap: 6px; }
+.choice button {
+  min-height: var(--tap); padding: 0 14px; border-radius: var(--r-pill);
+  border: 1.5px solid var(--line); background: var(--page);
+  font-size: 14px; font-weight: 600;
+}
+.choice button[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: #FFFFFF; }
+
+/* ============ Bottom sheet (reusable) ============ */
+.sheet-layer {
+  position: fixed; inset: 0; z-index: 100;        /* overlay: the one place fixed positioning is right */
+  display: grid; grid-template-columns: minmax(0, 1fr);
+}
+.sheet-scrim { grid-area: 1 / 1; background: rgba(28,27,25,0.5); }
+.sheet {
+  grid-area: 1 / 1; align-self: end; justify-self: center;
+  width: 100%; max-width: var(--max-w);
+  max-height: calc(100dvh - 48px);
+  display: flex; flex-direction: column;
+  background: var(--page);
+  border-radius: 16px 16px 0 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sheet:focus { outline: none; }
+.sheet-grab { padding: 12px 0 4px; display: flex; justify-content: center; cursor: grab; touch-action: none; }
+.sheet-handle { width: 41px; height: 7px; border-radius: var(--r-pill); background: var(--line); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 12px 4px var(--gutter); }
+.sheet-title { font-size: 18px; line-height: 20px; }
+.sheet-cancel { min-height: var(--tap); padding: 0 12px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.sheet-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 12px 0 24px; }
+
+/* Place picker (sheet content) */
+.place-current {
+  width: 100%; min-height: 56px; display: flex; align-items: center; gap: 12px;
+  padding: 8px var(--gutter); background: var(--card); text-align: left;
+}
+.place-current-icon { width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+.place-current-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.place-name { font-size: 16px; line-height: 18px; font-weight: 600; color: var(--ink); }
+.place-sub { font-size: 13px; line-height: 15px; font-weight: 600; color: var(--meta); }
+.place-check { color: var(--accent); }
+.search-field {
+  margin: 16px var(--gutter) 20px; height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--card); border: 2px solid var(--line); border-radius: 8px; color: var(--ink-2);
+}
+.search-field:focus-within { border-color: var(--ink); }
+.search-field input { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; font-weight: 600; color: var(--ink); -webkit-appearance: none; appearance: none; }
+.search-field input:focus { outline: none; }
+.search-field input::placeholder { color: var(--meta); }
+.place-section { padding: 0 var(--gutter); }
+.list-label { font-size: 11px; line-height: 12px; font-weight: 600; color: var(--ink-2); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.place-list li { border-bottom: 1px solid var(--line); }
+.place-list button { width: 100%; min-height: var(--tap); display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.place-list button[aria-pressed="true"] { color: var(--ink); }
+.place-empty { padding: 14px 0; font-size: 14px; color: var(--meta); }
+
+/* ============ Full moment view ============ */
+.moment-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px var(--gutter); }
+.moment-chapter { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.moment-chapter-label { font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.moment-chapter .btn-white { height: 48px; padding: 0 12px 0 14px; max-width: 180px; }
+.moment-chapter .btn-white span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.moment-body { display: flex; flex-direction: column; gap: 16px; padding: 0 var(--gutter) 24px; }
+.moment-card { min-height: 300px; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; padding: 16px 16px 32px; border-radius: 16px; background: var(--page); }
+.moment-main { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.moment-date { font-size: 18px; line-height: 20px; color: var(--ink-2); }
+.moment-text { font-size: 16px; line-height: 24px; font-weight: 400; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.moment-photo { width: 100%; aspect-ratio: 4 / 3; border-radius: 8px; background: var(--surface-strong); color: var(--ink); display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 8px; }
+.moment-photo img { width: 100%; height: 100%; object-fit: cover; }
+.moment-main .card-audio { margin-top: 8px; }
+.moment-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; color: var(--ink-2); }
+.moment-place { font-size: 14px; line-height: 15px; font-weight: 600; }
+.moment-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-2); }
+.moment-count { font-size: 13px; line-height: 15px; font-weight: 400; }
+.moment-actions { display: flex; gap: 8px; padding-left: 1px; }
+.moment-actions [aria-pressed="true"] { color: var(--accent); }
+
+/* Share sheet */
+.sheet-head .sheet-title { max-width: 230px; }
+.share-body { display: flex; flex-direction: column; gap: 16px; padding: 4px var(--gutter) 0; }
+.share-preview { background: var(--card); border-radius: 8px; box-shadow: var(--shadow-card); padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.share-text { font-size: 16px; line-height: 24px; font-weight: 400; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow-y: auto; }
+.share-by { display: flex; align-items: center; gap: 6px; font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); }
+.share-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.share-option {
+  min-height: 112px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: var(--page); border-radius: 8px; box-shadow: var(--shadow-pill);
+  font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2);
+}
+.share-option svg { color: var(--ink); }
+
+/* Filter sheet */
+.filter-body { display: flex; flex-direction: column; gap: 16px; padding: 4px var(--gutter) 0; }
+.filter-group { display: flex; flex-direction: column; gap: 10px; }
+.filter-label { font-size: 18px; line-height: 22px; font-weight: 600; color: var(--ink); }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.filter-chips button {
+  min-height: var(--tap); padding: 0 14px; border-radius: var(--r-pill);
+  border: 1.5px solid var(--line); background: var(--page); font-size: 14px; font-weight: 600; color: var(--ink);
+}
+.filter-chips button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #FFFFFF; }
+.filter-none { font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); }
+.filter-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.filter-foot { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 4px; }
+.filter-foot .link { align-self: center; }
+.filter-count { font-size: 14px; line-height: 15px; font-weight: 600; color: var(--ink-2); }
+/* Filter button shows how many filters are on */
+.filter-btn { display: inline-grid; place-items: center; }
+.filter-btn > * { grid-area: 1 / 1; }
+.filter-badge { justify-self: end; align-self: start; margin: -4px -4px 0 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-pill); background: var(--ink); color: #FFFFFF; font-size: 11px; line-height: 18px; font-weight: 600; }
+/* Chapter view */
+.chapter-head { display: flex; flex-direction: column; gap: 8px; padding: 16px var(--gutter); }
+.chapter-nav { display: flex; align-items: center; justify-content: space-between; }
+.chapter-title { font-size: 24px; line-height: 28px; color: var(--ink); overflow-wrap: anywhere; }
+.chapter-sub { font-size: 16px; line-height: 18px; font-weight: 600; color: var(--ink); }
+.filter-empty { padding: 32px var(--gutter); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: var(--ink-2); }
+
+/* Options list inside a sheet */
+.sheet-options { display: flex; flex-direction: column; padding: 0 var(--gutter); }
+.sheet-options button { min-height: 52px; display: flex; align-items: center; gap: 12px; text-align: left; font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--line); }
+.sheet-options button:last-child { border-bottom: 0; }
+.sheet-options .danger { color: var(--record); }
+
+/* Toast: brief confirmation (e.g. "Copied") */
+.toast-layer { position: fixed; inset: auto 0 calc(96px + env(safe-area-inset-bottom)) 0; z-index: 120; display: flex; justify-content: center; pointer-events: none; }
+.toast { background: var(--ink); color: #FFFFFF; font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: var(--r-pill); box-shadow: var(--shadow-pill); }
+
+/* ============ First-run name screen ============ */
+.welcome { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 32px; padding: 24px var(--gutter) calc(24px + env(safe-area-inset-bottom)); }
+.welcome-main { display: flex; flex-direction: column; gap: 16px; padding-top: 12vh; }
+.welcome-field input {
+  width: 100%; height: 56px; padding: 0 14px;
+  background: var(--card); border: 2px solid var(--line); border-radius: 8px;
+  font-size: 18px; font-weight: 600; color: var(--ink);
+}
+.welcome-field input:focus { outline: none; border-color: var(--ink); }
+.welcome-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.welcome-actions .link { align-self: center; }
+
+/* ============ Placeholder screens ============ */
+.placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: var(--gutter); text-align: center; color: var(--ink-2); }
+.placeholder .h2 { color: var(--ink); }
+.placeholder p { color: var(--meta); font-size: 14px; }
+
+/* ============ Reduced motion: no transforms, opacity only at 120ms ============
+   (Screen, sheet and in-place animations run through motion() in the script,
+   which follows the same rule.) */
+@media (prefers-reduced-motion: reduce) {
+  button, .btn-dark, .btn-white, .tab { transition: opacity 120ms ease; }
+  :is(button, .btn-dark, .btn-white, .tab):active:not(:disabled) { transform: none; }
+  .chev, .switch-knob { transition: none; }
+  .switch-track::before, .switch-knob::after { transition: opacity 120ms ease; }
+  .meter i { transition: opacity 120ms ease; transform: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="stage" class="stage"></div>
+</div>
+
+<script>
+/* ============ Icons (Tabler, stroke = currentColor) ============ */
+const svg = (size, d, sw = 2) =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const P = {
+  timeline: "M10 20a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M10 20H4M14 20H20M12 15l-2 -2H7a1 1 0 0 1 -1 -1V4a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-3l-2 2z",
+  hourglass: "M12 12a6 6 0 0 0 -6 6v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1 -1v-2a6 6 0 0 0 -6 -6zm0 0a6 6 0 0 1 -6 -6V4a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v2a6 6 0 0 1 -6 6z",
+  plus: "M12 5v14M5 12h14",
+  bookmark: "M18 7v14l-6 -4l-6 4V7a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4z",
+  settings: "M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065zM9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0",
+  menu: "M4 6h16M7 12h13M10 18h10",
+  chevronDown: "M6 9l6 6l6 -6",
+  chevronLeft: "M15 6l-6 6l6 6",
+  chevronRight: "M9 6l6 6l-6 6",
+  play: "M7 4v16l13 -8z",
+  pause: "M6 5h4v14H6zM14 5h4v14h-4z",
+  check: "M5 12l5 5l10 -10",
+  x: "M18 6L6 18M6 6l12 12",
+  search: "M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M21 21l-6 -6",
+  adjustments: "M4 10a2 2 0 1 0 4 0a2 2 0 0 0 -4 0M6 4v4M6 12v8M10 16a2 2 0 1 0 4 0a2 2 0 0 0 -4 0M12 4v10M12 18v2M16 7a2 2 0 1 0 4 0a2 2 0 0 0 -4 0M18 4v1M18 9v11",
+  mic: "M9 5a3 3 0 0 1 6 0v5a3 3 0 0 1 -6 0zM5 10a7 7 0 0 0 14 0M8 21h8M12 17v4",
+  photo: "M15 8h.01M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3zM3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3",
+  pin: "M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z",
+};
+const ICONS = {
+  timeline: svg(24, P.timeline), hourglass: svg(24, P.hourglass), plus: svg(24, P.plus),
+  bookmark: svg(24, P.bookmark), settings: svg(24, P.settings), menu: svg(24, P.menu),
+  chevronDown: svg(22, P.chevronDown).replace("<svg", '<svg class="chev"'),
+  back: svg(24, P.chevronLeft), check: svg(18, P.check), search: svg(20, P.search),
+  adjustments: svg(20, P.adjustments),
+  mic: svg(20, P.mic), photo: svg(20, P.photo), pin: svg(20, P.pin),
+  plusSm: svg(16, P.plus), checkBtn: svg(20, P.check), xBtn: svg(20, P.x),
+  xChip: svg(12, P.x, 2.5), xBadge: svg(8, P.x, 3.5),
+  micSm: svg(16, P.mic), pinSm: svg(16, P.pin), photoLg: svg(24, P.photo),
+  currentLocation: svg(20, "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M4 12a8 8 0 1 0 16 0a8 8 0 1 0 -16 0M12 2v2M12 20v2M20 12h2M2 12h2"),
+  searchSm: svg(20, P.search), checkSm: svg(18, P.check, 2.5),
+  chevronRight: svg(20, P.chevronRight),
+  arrowRight: svg(24, "M5 12h14M15 16l4 -4M15 8l4 4"),
+  play: svg(18, P.play),
+  pause: svg(18, "M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1H7a1 1 0 0 1 -1 -1zM14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"),
+  eyeCheck: svg(20, "M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0M11.102 17.957c-3.204 -.307 -5.904 -2.294 -8.102 -5.957c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6a19.5 19.5 0 0 1 -.663 1.032M15 19l2 2l4 -4"),
+  share: svg(24, "M3 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M15 6a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M8.7 10.7l6.6 -3.4M8.7 13.3l6.6 3.4"),
+  edit: svg(24, "M7 7H6a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97L9 12v3h3l8.385 -8.415zM16 5l3 3"),
+  bookmarkFilled: svg(24, "M18 7v14l-6 -4l-6 4V7a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4z").replace('fill="none"', 'fill="currentColor"'),
+  dots: svg(24, "M11 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M11 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"),
+  copy: svg(20, "M7 9.667A2.667 2.667 0 0 1 9.667 7h8.666A2.667 2.667 0 0 1 21 9.667v8.666A2.667 2.667 0 0 1 18.333 21H9.667A2.667 2.667 0 0 1 7 18.333zM4.012 16.737A2.005 2.005 0 0 1 3 15V5c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"),
+  whatsapp: svg(32, "M3 21l1.65 -3.8a9 9 0 1 1 3.4 2.9L3 21M9 10a.5 .5 0 0 0 1 0V9a.5 .5 0 0 0 -1 0v1a5 5 0 0 0 5 5h1a.5 .5 0 0 0 0 -1h-1a.5 .5 0 0 0 0 1", 1.75),
+  message: svg(32, "M3 20l1.3 -3.9C1.976 12.663 2.874 8.228 6.4 5.726c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501C16.608 19.942 11.659 20.922 7.7 19L3 20", 1.75),
+  link: svg(32, "M9 15l6 -6M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463", 1.75),
+  trash: svg(20,"M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12M9 7V4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"),
+};
+
+/* ============ Motion ============
+   Only transform and opacity are ever animated. will-change is set while an element moves
+   and cleared after. With prefers-reduced-motion, transforms are dropped and everything
+   becomes an opacity change at 120ms. */
+const EASE_OUT = "cubic-bezier(0.32,0.72,0,1)";
+const EASE_IN = "cubic-bezier(0.4,0,1,1)";
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function motion(el, frames, { duration, easing = EASE_OUT, fill = "none", delay = 0 }, reducedFrames) {
+  if (reduceMotion.matches) {
+    frames = reducedFrames || frames.map(({ transform, ...rest }) => rest);
+    duration = 120;
+    easing = "ease";
+  }
+  const props = [...new Set(frames.flatMap(Object.keys))];
+  el.style.willChange = props.join(", ");
+  const anim = el.animate(frames, { duration, easing, fill, delay });
+  const clear = () => { el.style.willChange = ""; };
+  anim.finished.then(clear, clear);
+  return anim;
+}
+
+// In-place change: 180ms fade + 4px lift
+const enter = el => motion(el, [{ opacity: 0, transform: "translateY(4px)" }, { opacity: 1, transform: "none" }], { duration: 180 });
+const leave = el => motion(el, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "translateY(-4px)" }], { duration: 180, easing: EASE_IN, fill: "forwards" });
+
+/* morph(container, [{ key, html }], { exit, instant })
+   Keyed update of a container's children: new keys fade in, unchanged keys are left alone,
+   changed content swaps without animation, missing keys are removed (fading out if `exit`). */
+const htmlOf = new WeakMap();
+function fromHTML(html, key) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  const el = t.content.firstElementChild;
+  el.dataset.key = key;
+  htmlOf.set(el, html);
+  return el;
+}
+function morph(container, items, { exit = false, instant = false } = {}) {
+  const current = new Map();
+  [...container.children].forEach(c => { if (!c.dataset.leaving) current.set(c.dataset.key, c); });
+  let prev = null;
+  for (const { key, html } of items) {
+    let el = current.get(key);
+    if (el) {
+      current.delete(key);
+      if (htmlOf.get(el) !== html) { const n = fromHTML(html, key); el.replaceWith(n); el = n; }
+    } else {
+      el = fromHTML(html, key);
+      if (prev) prev.after(el); else container.prepend(el);
+      if (!instant) enter(el);
+    }
+    prev = el;
+  }
+  const exits = [...current.values()].map(el => {
+    if (!exit || instant) { el.remove(); return null; }
+    el.dataset.leaving = "1";
+    return leave(el).finished.catch(() => {}).then(() => el.remove());
+  }).filter(Boolean);
+  return Promise.all(exits);
+}
+
+/* ============ Bottom sheet (reusable) ============
+   Sheet.open({ title, body, onMount(bodyEl), onClose(), returnFocus: () => element })
+   Slides up over a scrim. Dismiss: tap scrim, swipe down, Cancel, or Escape.
+   Only one sheet is open at a time; Sheet.close() closes it. */
+const Sheet = (() => {
+  let current = null;
+
+  function open({ title, body, onMount, onClose, returnFocus, closeLabel = "Cancel" }) {
+    if (current) close(true);
+    const layer = document.createElement("div");
+    layer.className = "sheet-layer";
+    layer.innerHTML = `
+      <div class="sheet-scrim" data-sheet-close></div>
+      <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" tabindex="-1">
+        <div class="sheet-grab" aria-hidden="true"><span class="sheet-handle"></span></div>
+        <header class="sheet-head">
+          <h2 class="sheet-title serif" id="sheet-title">${esc(title)}</h2>
+          <button class="sheet-cancel" data-sheet-close>${esc(closeLabel)}</button>
+        </header>
+        <div class="sheet-body">${body}</div>
+      </section>`;
+    document.body.appendChild(layer);
+    const sheet = layer.querySelector(".sheet"), scrim = layer.querySelector(".sheet-scrim"), bodyEl = layer.querySelector(".sheet-body");
+    current = { layer, sheet, scrim, onClose, returnFocus };
+
+    document.querySelector(".app").inert = true;
+    document.documentElement.style.overflow = "hidden";
+
+    layer.addEventListener("click", e => { if (e.target.closest("[data-sheet-close]")) close(); });
+    enableSwipe(sheet, bodyEl);
+    onMount && onMount(bodyEl);
+
+    // Sheet up 300ms, scrim fades in 200ms
+    motion(scrim, [{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "ease" });
+    motion(sheet, [{ transform: "translateY(100%)" }, { transform: "translateY(0)" }], { duration: 300, easing: EASE_OUT },
+      [{ opacity: 0 }, { opacity: 1 }]);
+    sheet.focus({ preventScroll: true });
+  }
+
+  function close(immediate) {
+    if (!current) return;
+    const { layer, sheet, scrim, onClose, returnFocus } = current;
+    current = null;
+    document.querySelector(".app").inert = false;
+    document.documentElement.style.overflow = "";
+    if (immediate) layer.remove();
+    else {
+      // Start from wherever it is now (mid-open, or mid-drag)
+      const fromT = getComputedStyle(sheet).transform, fromO = getComputedStyle(scrim).opacity;
+      sheet.getAnimations().forEach(a => a.cancel());
+      scrim.getAnimations().forEach(a => a.cancel());
+      layer.style.pointerEvents = "none";
+      const from = fromT === "none" ? "translateY(0)" : fromT;
+      // Sheet down 240ms, scrim fades out 200ms
+      const down = motion(sheet, [{ transform: from }, { transform: "translateY(100%)" }], { duration: 240, easing: EASE_IN, fill: "forwards" },
+        [{ opacity: 1 }, { opacity: 0 }]);
+      motion(scrim, [{ opacity: fromO }, { opacity: 0 }], { duration: 200, easing: "ease", fill: "forwards" });
+      const done = () => layer.remove();
+      down.finished.then(done, done);
+    }
+    onClose && onClose();
+    const f = returnFocus && returnFocus();
+    f && f.focus({ preventScroll: true });
+  }
+
+  // Swipe down to dismiss: from the handle anywhere, or from the content when it's scrolled to the top.
+  function enableSwipe(sheet, bodyEl) {
+    let startY = null, dy = 0, dragging = false, startT = 0;
+    const begin = (y, fromGrab) => {
+      if (!fromGrab && bodyEl.scrollTop > 0) return;
+      startY = y; dy = 0; dragging = false; startT = Date.now();
+    };
+    const move = (y, e) => {
+      if (startY === null) return;
+      dy = y - startY;
+      if (!dragging && dy > 8) dragging = true;
+      if (!dragging) return;
+      e.cancelable && e.preventDefault();
+      if (!sheet.style.willChange) sheet.style.willChange = "transform";
+      sheet.style.transform = `translateY(${Math.max(0, dy)}px)`;   // follows the finger
+    };
+    const end = () => {
+      if (startY === null) return;
+      startY = null;
+      if (!dragging) return;
+      sheet.style.willChange = "";
+      const fast = dy / Math.max(1, Date.now() - startT) > 0.6;
+      if (dy > 100 || (fast && dy > 30)) { close(); return; }
+      // Not far enough: spring back up
+      const from = sheet.style.transform;
+      sheet.style.transform = "";
+      motion(sheet, [{ transform: from }, { transform: "translateY(0)" }], { duration: 300, easing: EASE_OUT });
+    };
+    sheet.addEventListener("touchstart", e => begin(e.touches[0].clientY, !!e.target.closest(".sheet-grab, .sheet-head")), { passive: true });
+    sheet.addEventListener("touchmove", e => move(e.touches[0].clientY, e), { passive: false });
+    sheet.addEventListener("touchend", end);
+    sheet.addEventListener("touchcancel", end);
+    // Mouse drag on the handle, for testing on desktop
+    const grab = sheet.querySelector(".sheet-grab");
+    grab.addEventListener("pointerdown", e => {
+      if (e.pointerType !== "mouse") return;
+      begin(e.clientY, true);
+      const mm = ev => move(ev.clientY, ev);
+      const mu = () => { end(); removeEventListener("pointermove", mm); removeEventListener("pointerup", mu); };
+      addEventListener("pointermove", mm); addEventListener("pointerup", mu);
+    });
+  }
+
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && current) close(); });
+
+  return { open, close, isOpen: () => !!current };
+})();
+
+const EMPTY_ART = `<svg class="empty-art" viewBox="0 0 203 203" aria-hidden="true">
+  <circle cx="101.5" cy="101.5" r="101.5" fill="#F1C673"/>
+  <circle cx="101.5" cy="129.5" r="73.5" fill="#EFE6A8"/>
+  <circle cx="101.5" cy="156.5" r="46.5" fill="#F0F2DD"/>
+</svg>`;
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const $ = id => document.getElementById(id);
+const fmtTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const fmtDate = d => d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", "");
+
+/* ============ State (in memory only) ============ */
+const newDraft = () => ({
+  text: "",
+  audioDuration: null,   // seconds of recorded audio, kept alongside the words
+  photo: null,           // object URL
+  place: null,
+  chapter: null,
+  public: false,
+  anonymous: true,
+});
+
+const state = {
+  scope: "yours",        // yours | public | both
+  viewBy: "Day",
+  menuOpen: null,
+  entries: [],           // your own entries, newest first
+  nextId: 1,
+  firstRun: "pending",   // "pending" → "play" (set by the first Add Moment) → "done"; the intro runs once
+  name: null,            // your name, from the first-run name screen ("You" if skipped)
+  playing: null,         // { id, elapsed, timer } while a card's audio is "playing"
+  bookmarks: new Set(),  // ids of bookmarked moments
+  closedChapters: {},    // chapter name → date it was closed
+  filters: {             // personal timeline, day view
+    chapters: new Set(), // show only these chapters (any of them)
+    with: new Set(),     // "audio" | "photo" | "place" — entries must have all selected
+    visibility: null,    // null | "private" | "public"
+    predictions: false,  // include predictions (none exist yet)
+  },
+  draft: newDraft(),
+  capture: {
+    naming: false,       // chapter name field open
+    chapterInput: "",
+    promptIndex: null,   // set once from PROMPTS on first open, then held
+    speechPos: 0,
+    rec: null,           // active recording, or null
+  },
+};
+
+/* ============ Tab bar ============ */
+const TABS = [
+  { route: "timeline",    label: "Timeline",    icon: "timeline" },
+  { route: "predictions", label: "Predictions", icon: "hourglass" },
+  { route: "capture",     add: true },
+  { route: "bookmarks",   label: "Bookmarks",   icon: "bookmark" },
+  { route: "settings",    label: "Settings",    icon: "settings" },
+];
+
+function renderTabbar(route, hidden) {
+  const bar = $("tabbar");
+  bar.hidden = !!hidden;
+  bar.innerHTML = TABS.map(t => t.add
+    ? `<div class="tab-add"><a class="btn-dark" href="#capture" aria-label="Add a moment">${ICONS.plus}</a></div>`
+    : `<a class="tab" href="#${t.route}" ${t.route === route ? 'aria-current="page"' : ""}>
+         <span class="tab-icon">${ICONS[t.icon]}</span><span>${t.label}</span>
+       </a>`
+  ).join("");
+}
+
+const topbar = () => `
+  <header class="topbar">
+    <span class="wordmark serif">TYWW</span>
+    <a class="btn-dark btn-round" href="#menu" aria-label="Menu">${ICONS.menu}</a>
+  </header>`;
+
+/* ============ Timeline ============ */
+const SCOPES = [["yours", "Yours"], ["public", "Public"], ["both", "Both"]];
+const VIEWS = ["Day", "Month"];   // Week and Year removed for now
+const TITLES = { yours: "My Timeline", public: "Public Timeline", both: "Timeline" };
+
+/* Other people's public entries, for the Public and Both views. Same model as your own entries.
+   Ordinary, specific, unsentimental: things people would note down, not post.
+   [text, author (null = anonymous, shown as "Someone"), place, extras]
+   The first 21 land on today, spread through the day so far; the rest across the past month. */
+const PUBLIC_SEED = [
+  // — today —
+  ["Burnt the rice again. He ate it anyway.", "Priya", null],
+  ["Bus was late. Rain. Forgot my lunch.", null, "Cork"],
+  ["Finally planted the garlic. Late again but it'll come up anyway.", "Mei", null, { audioDuration: 42 }],
+  ["Made soup. Too much soup.", "Marek", null],
+  ["Cycled in. Regretted it by the canal.", "Aoife", "Dublin"],
+  ["She finally rang. Twenty minutes, about nothing.", null, null],
+  ["Ate lunch at my desk and didn't notice what it was.", "Femi", null],
+  ["Long meeting that could have been two lines.", "Chen", null],
+  ["Washing machine is making the noise again.", null, "Limerick"],
+  ["Neighbour's cat came in and sat on the good chair like it was owed.", "Siobhán", "Sligo", { photo: true }],
+  ["Two hours on hold to be told to ring back Monday.", "Yusuf", null],
+  ["Got the job. Haven't told anyone yet.", null, null],
+  ["Walked past the old school. They've painted the gates.", "Dara", "Ennis"],
+  ["Pharmacy was out of the thing. Again.", "Nadia", null],
+  ["Taught my son to tie his laces. He did it once and lost interest.", "Kwame", null],
+  ["Sat in the car outside the house for ten minutes before going in.", null, null],
+  ["Phone died at the station. Had to remember how to ask a stranger.", "Ines", "Galway"],
+  ["Bought the expensive coffee because the week asked for it.", "Ravi", null],
+  ["Talked to my sister for an hour. We didn't mention the will.", null, "Waterford"],
+  ["Football in the park, eight a side, nobody keeping score.", "Oisín", "Kilkenny", { audioDuration: 18 }],
+  ["Couldn't settle, so I cleaned the oven.", "Hana", null],
+  // — the past month —
+  ["My daughter beat me at chess and didn't gloat.", "Leila", null],
+  ["First morning I didn't need the heating on.", "Joe", "Tralee"],
+  ["Found a fiver in a coat I haven't worn since March.", null, null],
+  ["Told him I'd think about it. I've already decided.", "Rosa", null],
+  ["The baby slept through. I didn't.", "Amara", null],
+  ["Bus was so late I walked the whole way in and didn't mind.", null, "Bray"],
+  ["First fire of the year. Dog hasn't moved from in front of it since.", "Tomás", "Galway", { photo: true }],
+  ["Dad asked about the weather three times on the phone. I answered each time.", "Ciara", null],
+  ["Paid the last of the car loan. Nobody to tell, really.", "Bogdan", null],
+  ["Queue at the post office was out the door. Got talking to a man about pigeons.", "Grace", "Navan"],
+  ["Cleared out Mam's wardrobe. Kept the green cardigan.", null, null],
+  ["Left the umbrella on the train. Third one this year.", "Mateus", null],
+  ["Results came back clear.", null, null],
+  ["Forgot it was bin day. Again.", "Declan", "Drogheda"],
+  ["Fixed the shelf. It's not level but it's up.", "Zainab", null],
+  ["Brother texted for the first time since the summer. Just a photo of the dog.", "Fionn", null],
+  ["Moved the clocks back and still woke at six.", "Lena", null],
+  ["Signed the lease. Smaller kitchen, shorter commute.", "Sam", "Belfast"],
+  ["Nan didn't know who I was today. She was kind about it.", null, null],
+  ["Leaves blocked the drain and the yard flooded an inch.", "Marek", "Athlone"],
+  ["Last swim of the season. Water colder than the air.", "Aoife", "Dublin", { photo: true }],
+  ["The new manager learned everyone's name in a day.", "Femi", null],
+  ["Burned my hand on the oven tray. Dinner was fine.", "Priya", null],
+  ["Train stopped outside Athlone for forty minutes. Read the whole paper.", null, null],
+  ["Took the day off and spent it doing the things I take days off to avoid.", "Chen", null],
+  ["He said sorry first. That was new.", null, "Derry"],
+  ["Mowed the lawn, probably for the last time this year.", "Joe", null],
+  ["First week on nights. Everything is very quiet and very bright.", "Kwame", "Cork"],
+  ["Lost a filling on a toffee. Dentist can see me in three weeks.", "Ravi", null],
+  ["Parent-teacher meeting. Chatty but bright. Same as I got.", "Siobhán", null],
+  ["Exam done. Don't know how it went. Don't want to.", "Nadia", "Limerick"],
+  ["Got soaked waiting for a bus that never came.", null, null],
+  ["Grandad's watch stopped. Took it in to be fixed rather than replaced.", "Dara", null],
+  ["Landlord finally sent someone about the damp. He looked at it and left.", "Ines", null],
+  ["Packed the last box. The flat sounds different empty.", null, "Leeds", { photo: true }],
+  ["Planted bulbs I'll have forgotten about by spring.", "Mei", null],
+  ["Visa came through.", "Yusuf", null],
+  ["Didn't drink this week. Didn't tell anyone that either.", null, null],
+  ["Made the same joke at dinner I made last week. Same people laughed.", "Rosa", "Wexford"],
+];
+
+const OTHERS = (() => {
+  const now = new Date(), midnight = new Date(now); midnight.setHours(0, 0, 0, 0);
+  const TODAY = 21;
+  // Today's entries: from 06:30 (or earlier, if it's still early) up to a few minutes ago
+  const start = Math.min(midnight.getTime() + 6.5 * 3600e3, now.getTime() - 3 * 3600e3);
+  const end = now.getTime() - 4 * 60e3;
+  // Uneven gaps between today's entries (some bunched, some long quiet stretches), oldest → newest
+  const gaps = Array.from({ length: TODAY }, (_, i) => 0.25 + ((i * 53 + 7) % 17) / 6);
+  const total = gaps.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  const fractions = gaps.map(g => (acc += g) / total).reverse();   // newest first, to match the list order
+  return PUBLIC_SEED.map(([text, author, place, extra = {}], i) => {
+    let createdAt;
+    if (i < TODAY) {
+      createdAt = new Date(Math.max(midnight.getTime() + 60e3, start + (end - start) * fractions[i]));
+    } else {
+      const k = i - TODAY, n = PUBLIC_SEED.length - TODAY;
+      const day = new Date(midnight); day.setDate(day.getDate() - (1 + Math.floor((k * 29) / n)));
+      day.setHours(6 + ((k * 7) % 17), (k * 23) % 60);
+      createdAt = day;
+    }
+    return { id: `p${i + 1}`, text, author, anonymous: !author, place: place || undefined, createdAt, public: true, ...extra };
+  });
+})();
+
+const fmtClock = d => d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const fmtSpineDate = d => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const WAVE = [13, 26, 13, 19, 13, 26, 8, 26, 19];
+
+// The card's text line: the first sentence, or the first ~45 characters cut at a word, with an ellipsis.
+function cardLine(e) {
+  const t = (e.text || "").replace(/\s+/g, " ").trim();
+  if (!t) return e.audioDuration ? "Voice note" : e.photo ? "Photo" : e.place ? `In ${e.place}` : "A moment";
+  if (t.length <= 45) return t;   // short enough to show whole ("Burnt the rice again. He ate it anyway.")
+  const sentence = (t.match(/^.*?[.!?](?=\s|$)/) || [t])[0];
+  if (sentence.length <= 45) return sentence;
+  const cut = t.slice(0, 45);
+  return cut.slice(0, cut.lastIndexOf(" ") > 25 ? cut.lastIndexOf(" ") : 45).replace(/[\s,;:.!?-]+$/, "") + "…";
+}
+
+// Who a public entry is from: "Mei" / "Mei · Wexford", or "Someone" / "Someone in Wexford".
+// Seeded public entries keep their own names; only your name comes from the name screen.
+function attribution(e) {
+  if (e.anonymous || !e.author) return e.place ? `Someone in ${e.place}` : "Someone";
+  return [e.author, e.place].filter(Boolean).join(" · ");
+}
+
+// Meta line: your own → "15:00" / "15:00 · Wexford"; someone else's → their attribution.
+// No date on the card — the date lives on the spine beside it.
+function cardMeta(e) {
+  if (e.own) return [fmtClock(e.createdAt), e.place].filter(Boolean).join(" · ");
+  return attribution(e);
+}
+
+function audioBar(e) {
+  const p = state.playing && state.playing.id === e.id ? state.playing : null;
+  return `<div class="card-audio" id="audio-${e.id}">
+    <button class="card-play" data-action="play" data-value="${e.id}" aria-label="${p ? "Pause" : "Play"} recording">${p ? ICONS.pause : ICONS.play}</button>
+    <span class="wave" aria-hidden="true">${WAVE.map(h => `<i style="height:${h}px"></i>`).join("")}</span>
+    <span class="card-dur">${fmtTime(p ? p.elapsed : e.audioDuration)}</span>
+  </div>`;
+}
+
+// Chapters are private: they only ever show on your own entries, and never on the Public timeline
+let activeScope = "yours";   // the view the cards on screen belong to (a day can be opened as Public without changing your setting)
+const showChapter = e => !!e.chapter && e.own && activeScope !== "public";
+
+// Public cards carry a bookmark (the same bookmarks as the full moment view)
+function cardBookmark(id) {
+  const on = state.bookmarks.has(String(id));
+  return `<button class="card-bookmark" id="card-bm-${id}" data-action="card-bookmark" data-value="${id}" aria-pressed="${on}" aria-label="${on ? "Remove bookmark" : "Bookmark"}">${on ? ICONS.bookmarkFilled : ICONS.bookmark}</button>`;
+}
+
+// inRow: the card in a horizontal row (Both day view) shows the full text, clamped to three lines
+function entryCard(e, { inRow = false } = {}) {
+  const line = inRow ? (e.text || cardLine(e)) : cardLine(e);
+  return `<article class="entry-card" data-action="open-moment" data-value="${e.id}">
+    ${showChapter(e) ? `<span class="card-chapter">${esc(e.chapter)}</span>` : ""}
+    <div class="card-head">
+      <a class="card-title" href="#moment/${e.id}">${esc(line)}</a>
+      <span class="card-go" aria-hidden="true">${ICONS.arrowRight}</span>
+    </div>
+    ${e.photo ? `<div class="card-photo" role="img" aria-label="Photo attached">${ICONS.photoLg}</div>` : ""}
+    ${e.audioDuration ? audioBar(e) : ""}
+    <p class="card-meta">${esc(cardMeta(e))}</p>
+    ${e.own ? "" : cardBookmark(e.id)}
+    ${e.own && e.public ? `<p class="card-shared">${ICONS.eyeCheck}<span>${e.anonymous ? "Shared Anonymously" : `Shared as ${esc(myName())}`}</span></p>` : ""}
+  </article>`;
+}
+
+function visibleEntries(scope = state.scope) {
+  const mine = state.entries;
+  const list = scope === "yours" ? mine
+    : scope === "public" ? [...mine.filter(e => e.public), ...OTHERS]
+    : [...mine, ...OTHERS];
+  return list.slice().sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/* ============ Both — day view ============
+   The page scrolls down through days; within a day, two rows scroll sideways:
+   your moments, a date marker, then "Similar moments" from the public timeline. */
+const PUBLIC_ROW_CAP = 18;
+const posts = n => `${n} ${n === 1 ? "post" : "posts"}`;
+
+/* ============ Relatedness ("Similar moments") ============
+   Stand-in for what the real app would do with similarity models or what someone reads and searches.
+   Public moments from the same day are ranked by how much they share with what you wrote:
+     • the same words (strongest), • the same topics, • the same place,
+   then, more weakly, the topics you tend to write about on other days (your "history").
+   Anything with no overlap still shows, after the related ones, newest first. */
+const TOPICS = {
+  food:     "rice soup lunch dinner breakfast eat ate cook cooked cooking toast coffee tea toffee oven bread meal",
+  weather:  "rain raining rained wet soaked cold freezing heating sun sunny wind fire frost umbrella storm",
+  commute:  "bus train cycle cycled cycling car walk walked walking commute station canal drive drove traffic",
+  family:   "mam mum mother dad father daughter son sister brother nan grandad granny baby kids child parent family wife husband",
+  work:     "job meeting manager desk shift office work boss interview exam nights",
+  home:     "flat house landlord lease damp box boxes packed move moving shelf washing bin wardrobe kitchen",
+  sea:      "swim swam swimming sea water beach pier burrow tide",
+  garden:   "garlic bulbs planted plant garden lawn mowed allotment",
+  health:   "dentist results pharmacy doctor hospital sleep slept tired filling",
+  money:    "paid pay loan bill fiver money expensive cost",
+  pets:     "dog cat",
+};
+const TOPIC_OF = new Map(Object.entries(TOPICS).flatMap(([t, words]) => words.split(" ").map(w => [w, t])));
+const STOP = new Set("the a an and or but so of to in on at for with from by is was were be been it its this that i i'm i've i'd me my we our you your he him his she her they them their there then than as just again too very really not no didn't don't haven't had has have do did get got still about into out up down over one two all some any what when who how".split(" "));
+
+function termsOf(text) {
+  return new Set((text || "").toLowerCase().replace(/[^a-z' ]+/g, " ").split(/\s+/)
+    .map(w => w.replace(/^'+|'+$/g, ""))
+    .filter(w => w.length > 2 && !STOP.has(w))
+    .map(w => w.length > 5 ? w.replace(/(ing|ed|es|s)$/, "") : w));
+}
+function topicsOf(text) {
+  const words = (text || "").toLowerCase().replace(/[^a-z ]+/g, " ").split(/\s+/);
+  return new Set(words.map(w => TOPIC_OF.get(w)).filter(Boolean));
+}
+
+// What you wrote that day, plus what you write about in general
+function interestProfile(dayEntries, allEntries) {
+  const text = es => es.map(e => e.text || "").join(" ");
+  return {
+    words: termsOf(text(dayEntries)),
+    topics: topicsOf(text(dayEntries)),
+    places: new Set(dayEntries.map(e => e.place).filter(Boolean)),
+    history: topicsOf(text(allEntries)),
+  };
+}
+
+function relatedness(e, p) {
+  let score = 0;
+  termsOf(e.text).forEach(w => { if (p.words.has(w)) score += 3; });
+  topicsOf(e.text).forEach(t => { if (p.topics.has(t)) score += 2; else if (p.history.has(t)) score += 1; });
+  if (e.place && p.places.has(e.place)) score += 2;
+  return score;
+}
+
+// The public row for a day: most related first, then the rest newest first, capped
+function similarMoments(key) {
+  const newest = (a, b) => b.createdAt - a.createdAt;
+  const sameDay = OTHERS.filter(e => dayKey(e.createdAt) === key);
+  const profile = interestProfile(state.entries.filter(e => dayKey(e.createdAt) === key), state.entries);
+  return sameDay
+    .map(e => ({ e, s: relatedness(e, profile) }))
+    .sort((a, b) => b.s - a.s || newest(a.e, b.e))
+    .slice(0, PUBLIC_ROW_CAP)
+    .map(x => x.e);
+}
+
+/* One sideways timeline. Each day is a column of a single grid:
+     row 1  "Your timeline (n posts)"
+     row 2  your cards for that day
+     row 3  the timeline line, with that day's date marker
+     row 4  "Similar moments (n posts)" + its line
+     row 5  public cards for that day, ending in "View full timeline ›"
+   Swiping left moves back in time: past today's cards you reach NOV 7, then Nov 7's cards, and so on.
+   The line runs unbroken through every column. Each day's headings and date stick to the left edge
+   while that day passes, then get pushed off by the next — like the month labels. */
+// focusKey: a day to include (even if empty) — the day screen then scrolls the band to it
+function bothDayView(focusKey) {
+  const keys = new Set([dayKey(new Date())]);
+  if (focusKey) keys.add(focusKey);
+  [...state.entries, ...OTHERS].forEach(e => keys.add(dayKey(e.createdAt)));
+  const days = [...keys].sort().reverse();
+  return `
+    <div class="band" role="region" aria-label="Your timeline and similar moments, newest day first. Swipe to go back in time.">
+      <div class="band-grid">${days.map((key, i) => bothDayColumn(key, i + 1)).join("")}</div>
+    </div>`;
+}
+
+function bothDayColumn(key, col) {
+  const d = parseDayKey(key);
+  const newest = (a, b) => b.createdAt - a.createdAt;
+  const mine = state.entries.filter(e => dayKey(e.createdAt) === key).sort(newest);
+  const others = similarMoments(key);   // ranked by relatedness to what you wrote
+  const marker = `${d.toLocaleDateString("en-GB", { month: "short" }).toUpperCase()} ${d.getDate()}`;
+  const at = row => `style="grid-column:${col};grid-row:${row}"`;
+  return `
+    <div class="bc bc-head" ${at(1)}>
+      <h2 class="both-title serif stick">Your timeline <small>(${posts(mine.length)})</small></h2>
+    </div>
+    <div class="bc bc-row" ${at(2)} role="group" aria-label="Your moments, ${d.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}">
+      ${mine.length ? mine.map(e => entryCard(e, { inRow: true })).join("") : `<p class="both-none">Nothing from you on this day</p>`}
+    </div>
+    <div class="bc-line${col === 1 ? " first" : ""}" ${at(3)} data-day="${key}">
+      <span class="dm-label stick">${marker}</span>
+    </div>
+    <div class="bc bc-head" ${at(4)}>
+      <div class="stick">
+        <h2 class="both-title serif">Similar moments <small>(${posts(others.length)})</small></h2>
+        <p class="both-sub">A selection of thoughts people wrote alongside you that day</p>
+      </div>
+    </div>
+    <div class="bc bc-row" ${at(5)} role="group" aria-label="Similar moments, ${d.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}">
+      ${others.map(e => entryCard(e, { inRow: true })).join("")}
+      <a class="btn-dark view-full" href="#day/${key}/public">View Full Timeline</a>
+    </div>`;
+}
+
+function timelineList(list) {
+  return `<section class="tl" style="grid-template-rows: repeat(${list.length}, auto) 1fr" aria-label="Moments">
+    <div class="tl-spine" aria-hidden="true"><span class="tl-dot"></span><span class="tl-line"></span></div>
+    ${list.map((e, i) => `
+      <div class="tl-date" style="grid-row:${i + 1}" data-entry="${e.id}">${fmtSpineDate(e.createdAt)}</div>
+      <div class="tl-cell" style="grid-row:${i + 1}" data-entry="${e.id}">${entryCard(e)}</div>`).join("")}
+  </section>`;
+}
+
+/* ============ Heat scale ============
+   Two scales, because your own volume and everyone's are orders of magnitude apart.
+   Each bucket covers counts up to and including `max`. `fg` is the text colour on that fill.
+
+   Yours is relative to your own busiest day: the darkest colour means exactly that day's count,
+   the three lighter steps split everything below it. The legend always shows the full scale.
+   Public is a fixed scale. */
+const HEAT_SCALES = {
+  yours: {
+    relative: true,
+    steps: [
+      { bg: "#F8FAE4", fg: "#1C1B19" },   // nothing
+      { bg: "#E9EDCD", fg: "#1C1B19" },   // up to a third of your busiest
+      { bg: "#EFE6A8", fg: "#1C1B19" },   // up to two thirds
+      { bg: "#F1C673", fg: "#1C1B19" },   // more, but not your busiest
+      { bg: "#BF2E53", fg: "#FFFFFF" },   // your busiest day
+    ],
+  },
+  public: {
+    buckets: [
+      { max: 0,        bg: "#F8FAE4", fg: "#1C1B19" },
+      { max: 20,       bg: "#E9EDCD", fg: "#1C1B19" },   // 1–20
+      { max: 50,       bg: "#EFE6A8", fg: "#1C1B19" },   // 21–50
+      { max: 70,       bg: "#F1C673", fg: "#1C1B19" },   // 51–70
+      { max: 100,      bg: "#E47B43", fg: "#1C1B19" },   // 71–100
+      { max: Infinity, bg: "#BF2E53", fg: "#FFFFFF" },   // 100+
+    ],
+    legend: ["0", "100+"],
+  },
+};
+const NO_DATA = { bg: "#FEFFF8", fg: "#8C877F" };   // outside the month — never "zero"
+
+// The most moments you've added on any single day (0 if none yet)
+function busiestDay() {
+  const perDay = {};
+  state.entries.forEach(e => { const k = dayKey(e.createdAt); perDay[k] = (perDay[k] || 0) + 1; });
+  return Math.max(0, ...Object.values(perDay));
+}
+
+// The buckets and legend for a scale. Yours is rebuilt from your busiest day. Every step is always
+// present (so the legend shows the full scale); a step whose range is empty is simply never matched.
+function scaleBuckets(scale) {
+  const s = HEAT_SCALES[scale];
+  if (!s.relative) return { buckets: s.buckets, legend: s.legend };
+  const top = busiestDay();
+  const [empty, light, mid, high, busiest] = s.steps;
+  const buckets = [
+    { max: 0, ...empty },
+    { max: Math.floor(top / 3), ...light },
+    { max: Math.floor((2 * top) / 3), ...mid },
+    { max: top - 1, ...high },
+    { max: Infinity, ...busiest },
+  ];
+  return { buckets, legend: ["0", top ? `${top} · your busiest day` : "your busiest day"] };
+}
+
+// cell colour = f(count, scale)
+function heatColour(count, scale) {
+  if (count === null || count === undefined) return NO_DATA;
+  return scaleBuckets(scale).buckets.find(b => count <= b.max);
+}
+
+const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const parseDayKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+const startOfToday = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
+
+// Everyone's public moments per day — simulated but stable for a given date (hundreds-scale)
+function publicCount(d) {
+  const seed = d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate();
+  let x = Math.sin(seed * 12.9898) * 43758.5453; x -= Math.floor(x);
+  const weekend = d.getDay() === 0 || d.getDay() === 6 ? 22 : 0;
+  return Math.round(4 + x * 104 + weekend);
+}
+
+// Counts for a day in a scale. Days that haven't happened yet are simply empty (0) —
+// grey is reserved for days outside the month.
+function countFor(d, scale) {
+  if (d > startOfToday()) return 0;
+  const key = dayKey(d);
+  if (scale === "yours") return state.entries.filter(e => dayKey(e.createdAt) === key).length;
+  // Never fewer than the seeded entries you can actually scroll through for that day
+  const seeded = OTHERS.filter(e => dayKey(e.createdAt) === key).length;
+  return Math.max(publicCount(d), seeded) + state.entries.filter(e => e.public && dayKey(e.createdAt) === key).length;
+}
+
+function legend(scale) {
+  const s = scaleBuckets(scale);
+  return `<div class="legend" aria-label="Colour scale: ${s.legend[0]} to ${s.legend[1]}">
+    <span>${s.legend[0]}</span>
+    <span class="legend-swatches" aria-hidden="true">${s.buckets.map(b => `<i style="--sw:${b.bg}"></i>`).join("")}</span>
+    <span>${s.legend[1]}</span>
+  </div>`;
+}
+
+const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
+
+// One month grid in one scale. `texture` = short cells, no numbers (public grid in Both).
+function monthGrid(year, month, scale, { title, texture = false } = {}) {
+  const first = new Date(year, month, 1);
+  const lead = (first.getDay() + 6) % 7;                       // Monday-first
+  const days = new Date(year, month + 1, 0).getDate();
+  const total = Math.ceil((lead + days) / 7) * 7;
+  let sum = 0;
+  const cells = [];
+  for (let i = 0; i < total; i++) {
+    const n = i - lead + 1;
+    if (n < 1 || n > days) { cells.push(`<div class="cell outside${texture ? " texture" : ""}" aria-hidden="true"></div>`); continue; }
+    const d = new Date(year, month, n);
+    const count = countFor(d, scale);
+    sum += count || 0;
+    const c = heatColour(count, scale);
+    const label = `${d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}, ${count === null ? "no data yet" : `${count} ${count === 1 ? "entry" : "entries"}`}`;
+    cells.push(`<button class="cell${texture ? " texture" : ""}" style="--heat-bg:${c.bg};--heat-fg:${c.fg}" data-action="open-day" data-value="${dayKey(d)}" aria-label="${label}">${texture ? "" : `
+      <span class="cell-date">${n}</span>${count ? `<span class="cell-count">${count}</span>` : ""}`}</button>`);
+  }
+  return `
+    <div class="grid-head">
+      ${title ? `<h3 class="grid-title serif">${title}</h3>` : ""}
+      <span class="grid-count">${sum.toLocaleString("en-GB")} ${sum === 1 ? "Entry" : "Entries"}</span>
+    </div>
+    ${texture ? "" : `<div class="weekdays" aria-hidden="true">${WEEKDAYS.map(w => `<span>${w}</span>`).join("")}</div>`}
+    <div class="mgrid">${cells.join("")}</div>
+    ${legend(scale)}`;
+}
+
+// Continuous scroll: this month first, then further back in time. A year's worth.
+function monthView() {
+  const now = new Date();
+  const sections = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const y = d.getFullYear(), m = d.getMonth();
+    const name = d.toLocaleDateString("en-GB", { month: "short" }).replace(".", "") + (y !== now.getFullYear() ? ` ${y}` : "");
+    const full = d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    const body = state.scope === "both"
+      ? monthGrid(y, m, "yours", { title: "Your timeline" }) + `<div class="grid-gap"></div>` + monthGrid(y, m, "public", { title: "Public timeline", texture: true })
+      : monthGrid(y, m, state.scope === "public" ? "public" : "yours");
+    sections.push(`
+      <section class="month" aria-label="${full}">
+        <div class="month-rail"><h2 class="month-label">${name}</h2></div>
+        <div class="month-body">${body}</div>
+      </section>`);
+  }
+  return `<div class="months">${sections.join("")}</div>`;
+}
+
+/* ============ Day screen ============
+   Opened from a month cell (in whichever view you're in), or from "View full timeline"
+   in the Both day view, which opens it as Public ("#day/<date>/public") without changing your setting. */
+function dayScreen(key, forced) {
+  const d = parseDayKey(key);
+  const scope = forced === "public" ? "public" : state.scope;
+  activeScope = scope;
+  const list = visibleEntries(scope).filter(e => dayKey(e.createdAt) === key);
+  const pub = countFor(d, "public");
+  const mine = list.filter(e => e.own).length;
+  const publicLine = `${(pub || 0).toLocaleString("en-GB")} moments were shared publicly on this day`;
+  const summary = scope === "yours"
+    ? (mine ? `You added ${mine === 1 ? "one moment" : `${mine} moments`} on this day` : "")
+    : scope === "both" ? `${publicLine}${mine ? ` · ${mine} of yours` : ""}`
+    : publicLine;
+  // Laid out like the timeline's day view for that scope: the sideways band for Both
+  // (opened at this date, so you can keep swiping back), the spine list for Yours and Public.
+  const both = scope === "both";
+  return {
+    mount() {
+      if (!both) return;
+      const band = document.querySelector("#stage .layer:not(.leaving) .band");
+      const col = band && band.querySelector(`.bc-line[data-day="${key}"]`);
+      if (col) band.scrollLeft = col.offsetLeft - 16;
+    },
+    html: `
+      ${topbar()}
+      <div class="day-head">
+        <button class="btn-dark btn-round" data-action="back" aria-label="Back">${ICONS.back}</button>
+        <h1 class="day-title serif">${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" })}</h1>
+      </div>
+      <div class="segment-wrap">
+        <div class="segment" role="group" aria-label="Whose moments">
+          ${SCOPES.map(([k, l]) => `<button data-action="scope" data-value="${k}" aria-pressed="${scope === k}">${l}</button>`).join("")}
+        </div>
+      </div>
+      ${both ? bothDayView(key)
+      : `${summary ? `<p class="day-summary">${summary}</p>` : ""}
+      ${list.length ? timelineList(list)
+        : `<p class="day-empty">${scope === "yours" ? "You didn't add anything on this day." : "No sample moments to show for this day."}</p>`}`}`,
+  };
+}
+
+// First-run intro: the spine grows up from the bottom, then the new card pops in. Runs once, ever.
+function playFirstRun(entryId) {
+  const spine = document.querySelector(".tl-spine");
+  if (spine) motion(spine, [{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }],
+    { duration: 500, easing: EASE_OUT }, [{ opacity: 0 }, { opacity: 1 }]);
+  document.querySelectorAll(`[data-entry="${entryId}"]`).forEach(el =>
+    motion(el, [{ opacity: 0, transform: "scale(0.96)" }, { opacity: 1, transform: "scale(1)" }],
+      { duration: 260, easing: EASE_OUT, delay: 150, fill: "backwards" }, [{ opacity: 0 }, { opacity: 1 }]));
+}
+
+// Simulated playback on a card's audio bar
+function togglePlay(id) {
+  const p = state.playing;
+  stopPlayback();
+  if (p && p.id === id) return;
+  const e = [...state.entries, ...OTHERS].find(x => String(x.id) === String(id));
+  if (!e) return;
+  state.playing = { id: e.id, elapsed: 0, timer: setInterval(() => {
+    state.playing.elapsed++;
+    if (state.playing.elapsed >= e.audioDuration) { stopPlayback(); return; }
+    const bar = document.getElementById(`audio-${e.id}`);
+    if (bar) bar.outerHTML = audioBar(e);
+  }, 1000) };
+  const bar = document.getElementById(`audio-${e.id}`);
+  if (bar) bar.outerHTML = audioBar(e);
+}
+function stopPlayback() {
+  const p = state.playing;
+  if (!p) return;
+  clearInterval(p.timer);
+  state.playing = null;
+  const e = [...state.entries, ...OTHERS].find(x => x.id === p.id);
+  const bar = document.getElementById(`audio-${p.id}`);
+  if (e && bar) bar.outerHTML = audioBar(e);
+}
+
+const screens = {};
+
+/* ============ Chapter view ============
+   Shown on the personal day view while a chapter is chosen in the filter sheet.
+   Only your moments tagged with that chapter when they were created; other filters still apply. */
+const fmtShortDate = d => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+function chapterView(list) {
+  const names = [...state.filters.chapters];
+  const tagged = state.entries.filter(e => state.filters.chapters.has(e.chapter));
+  const n = tagged.length;
+  const since = tagged.length ? new Date(Math.min(...tagged.map(e => +e.createdAt))) : new Date();
+  const one = names.length === 1 ? names[0] : null;
+  const closed = one && state.closedChapters[one];
+  const moments = `${n} ${n === 1 ? "moment" : "moments"}`;
+  const sub = closed ? `${fmtShortDate(since)} – ${fmtShortDate(closed)}, ${moments}` : `Open since ${fmtShortDate(since)}, ${moments}`;
+  return `
+    ${topbar()}
+    <div class="chapter-head">
+      <div class="chapter-nav">
+        <button class="btn-dark btn-round" data-action="chapter-exit" aria-label="Back to your timeline">${ICONS.back}</button>
+        ${one ? `<button class="btn-white btn-pill" data-action="chapter-close" data-value="${esc(one)}">${closed ? "Reopen Chapter" : "Close Chapter"}</button>` : ""}
+      </div>
+      <h1 class="chapter-title serif">${esc(names.join(" & "))}</h1>
+      <p class="chapter-sub">${sub}</p>
+    </div>
+    ${list.length ? timelineList(list) : `
+      <section class="filter-empty">
+        <p>No moments in this chapter match the other filters.</p>
+        <button class="link" data-action="filters-clear">Clear filters</button>
+      </section>`}`;
+}
+
+screens.timeline = () => {
+  activeScope = state.scope;
+  const open = state.menuOpen === "viewby";
+  const filterable = state.scope === "yours" && state.viewBy === "Day";   // filters live on the personal day view
+  const all = visibleEntries();
+  const list = filterable ? applyFilters(all) : all;
+  const nFilters = filterCount();
+  // A chapter chosen in the filter sheet turns the personal day view into that chapter's view
+  const inChapter = filterable && state.filters.chapters.size > 0;
+  const actions = filterable
+    ? `<button class="btn-white btn-round filter-btn" data-action="open-filters" aria-label="Filters${nFilters ? `, ${nFilters} applied` : ""}">
+         ${ICONS.adjustments}${nFilters ? `<span class="filter-badge" aria-hidden="true">${nFilters}</span>` : ""}</button>`
+    : `<a class="btn-white btn-round" href="#filter" aria-label="Filter">${ICONS.adjustments}</a>`;
+  if (inChapter) return { html: chapterView(list), actions };
+  return {
+    mount() {
+      if (state.firstRun === "play") {
+        state.firstRun = "done";
+        if (state.entries[0]) playFirstRun(state.entries[0].id);
+      }
+    },
+    html: `
+      ${topbar()}
+      <div class="segment-wrap">
+        <div class="segment" role="group" aria-label="Whose moments">
+          ${SCOPES.map(([k, l]) => `<button data-action="scope" data-value="${k}" aria-pressed="${state.scope === k}">${l}</button>`).join("")}
+        </div>
+      </div>
+      <div class="title-row">
+        <div class="title-block">
+          <h1 class="h2 serif">${TITLES[state.scope]}</h1>
+          <div class="viewby">
+            <span class="viewby-label" id="viewby-label">View by:</span>
+            <div class="menu-anchor">
+              <button class="btn-white btn-pill" data-action="toggle-menu" data-value="viewby"
+                      aria-haspopup="menu" aria-expanded="${open}" aria-labelledby="viewby-label viewby-value">
+                <span id="viewby-value">${state.viewBy}</span>${ICONS.chevronDown}
+              </button>
+              <div class="menu" role="menu" ${open ? "" : "hidden"}>
+                ${VIEWS.map(v => `<button role="menuitemradio" aria-checked="${state.viewBy === v}" data-action="viewby" data-value="${v}">${v}${state.viewBy === v ? ICONS.check : ""}</button>`).join("")}
+              </div>
+            </div>
+          </div>
+        </div>
+        <a class="btn-white btn-round" href="#search" aria-label="Search">${ICONS.search}</a>
+      </div>
+      ${state.viewBy === "Month" ? monthView()
+      : state.scope === "both" ? bothDayView()
+      : list.length === 0 && all.length > 0 ? `
+        <section class="filter-empty">
+          <p>No moments match ${nFilters === 1 ? "this filter" : "these filters"}.</p>
+          <button class="link" data-action="filters-clear">Clear filters</button>
+        </section>`
+      : list.length === 0 ? `
+        <section class="empty">
+          ${EMPTY_ART}
+          <h2 class="empty-title serif">Start growing your timeline</h2>
+          <p class="empty-body">Add your first moment by tapping the add button in the main nav</p>
+        </section>`
+      : timelineList(list)}
+    `,
+    actions,
+  };
+};
+
+/* ============ Capture ============ */
+const PROMPT_BANDS = {
+  morning: [
+    "Morning. What's today looking like?",
+    "Anything on today worth keeping?",
+    "Early one. What's happening?",
+  ],
+  afternoon: [
+    "Halfway through. How's it going?",
+    "Afternoon. Anything so far?",
+    "What's the day been like?",
+  ],
+  evening: [
+    "Nice evening — what's happening with you?",
+    "Evening. How was it?",
+    "What kind of day was it?",
+  ],
+  late: [
+    "Still up. What's on your mind?",
+    "Late one. Anything worth putting down?",
+  ],
+  anytime: [
+    "What's going on?",
+    "Anything you'd want to read back one day?",
+    "Something small from today?",
+    "What's different about today?",
+    "What's the most ordinary thing that happened today?",
+    "Something that'll seem small in a year?",
+    "What would you tell someone about today?",
+  ],
+};
+
+// morning 05–12, afternoon 12–17, evening 17–22, late 22–05
+function bandFor(date) {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 17) return "afternoon";
+  if (h >= 17 && h < 22) return "evening";
+  return "late";
+}
+
+// Fixed for the whole session: the current band, then "anytime", then loop.
+// "Change Prompt" steps through this list in order, starting from the opening prompt.
+const PROMPT_BAND = bandFor(new Date());
+const PROMPTS = [...PROMPT_BANDS[PROMPT_BAND], ...PROMPT_BANDS.anytime];
+const OPENING_PROMPT = Math.floor(Math.random() * PROMPT_BANDS[PROMPT_BAND].length);
+// Towns and cities only — never street addresses. Detection is simulated.
+const PLACE_DATA = {
+  detected: "Wexford",
+  nearby: ["Rosslare", "Enniscorthy", "New Ross", "Gorey"],
+  all: ["Arklow", "Athlone", "Ballina", "Bantry", "Barcelona", "Belfast", "Bray", "Carlow", "Castlebar", "Cavan",
+        "Clonakilty", "Clonmel", "Cobh", "Cork", "Derry", "Dingle", "Donegal", "Drogheda", "Dublin", "Dundalk",
+        "Dungarvan", "Edinburgh", "Ennis", "Enniscorthy", "Galway", "Gorey", "Greystones", "Kildare", "Kilkenny",
+        "Killarney", "Kinsale", "Letterkenny", "Limerick", "Lisbon", "London", "Longford", "Manchester", "Mullingar",
+        "Naas", "Navan", "New Ross", "New York", "Newbridge", "Paris", "Portlaoise", "Rosslare", "Sligo", "Tralee",
+        "Tramore", "Tullamore", "Waterford", "Westport", "Wexford", "Wicklow"],
+};
+const SPEECH = "Tough day today. Work ran late and I missed the bus, but Mam rang and we talked for ages. Feeling a bit lighter now.".split(" ");
+// Your name comes from the first-run name screen ("You" if skipped). There's no country on the profile.
+const myName = () => state.name || "You";
+
+screens.capture = () => {
+  if (state.capture.promptIndex === null) state.capture.promptIndex = OPENING_PROMPT;
+  return {
+  hideTabbar: true,
+  html: `
+    ${topbar()}
+    <div class="capture">
+      <div class="capture-main">
+        <div class="capture-nav">
+          <button class="btn-dark btn-round" data-action="back" aria-label="Back">${ICONS.back}</button>
+          <span class="capture-date">${fmtDate(new Date())}</span>
+        </div>
+
+        <div class="prompt">
+          <h1 class="h2 serif" id="prompt">${PROMPTS[state.capture.promptIndex]}</h1>
+          <button class="link" data-action="change-prompt">Change Prompt</button>
+        </div>
+
+        <div class="composer">
+          <div class="composer-body">
+            <textarea id="entry-text" class="composer-text" rows="3" placeholder="Type here" aria-labelledby="prompt"></textarea>
+            <div id="live-text" class="composer-text" aria-live="polite" hidden></div>
+            <div id="attachments" class="attachments" hidden></div>
+          </div>
+          <div id="tools" class="composer-tools"></div>
+        </div>
+        <input id="photo-input" type="file" accept="image/*" class="sr-only" tabindex="-1" aria-hidden="true">
+
+        <section class="group" aria-labelledby="chapter-label">
+          <h2 class="group-label" id="chapter-label">Add to chapter</h2>
+          <div id="chapter" style="width:100%"></div>
+        </section>
+
+        <section class="group">
+          <h2 class="group-label" id="public-label">Add to Public Timeline?</h2>
+          <div>
+            <button class="switch" id="public-switch" role="switch" aria-checked="false" aria-labelledby="public-label" data-action="toggle-public">
+              <span class="switch-track"><span class="switch-knob"></span></span>
+            </button>
+            <div id="attribution"></div>
+          </div>
+        </section>
+      </div>
+
+      <button id="add-moment" class="btn-dark btn-block" data-action="add-moment">Add Moment</button>
+    </div>
+  `,
+  mount() {
+    const ta = $("entry-text");
+    ta.value = state.draft.text;
+    autosize(ta);
+    ta.addEventListener("input", () => { state.draft.text = ta.value; autosize(ta); });
+    $("photo-input").addEventListener("change", onPhotoPicked);
+    renderCapture(true);
+  },
+  };
+};
+
+function autosize(el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; }
+
+// `instant` skips the fade-in (used when the screen first mounts — the screen transition covers it)
+function renderCapture(instant) {
+  renderAttachments(instant); renderTools(instant); renderChapter(instant); renderPublic(instant); renderAddButton();
+}
+
+function renderAttachments(instant) {
+  const d = state.draft, el = $("attachments");
+  const items = [];
+  if (d.photo) items.push({ key: "photo", html: `
+    <div class="thumb">
+      <span class="thumb-tile" role="img" aria-label="Photo attached">${ICONS.photoLg}</span>
+      <button class="thumb-x" data-action="remove-photo" aria-label="Remove photo"><span>${ICONS.xBadge}</span></button>
+    </div>` });
+  if (d.place) items.push({ key: "place", html: `
+    <span class="chip">${ICONS.pinSm}<span>${esc(d.place)}</span>
+      <button class="chip-x" data-action="remove-place" aria-label="Remove place ${esc(d.place)}"><span>${ICONS.xChip}</span></button>
+    </span>` });
+  if (d.audioDuration) items.push({ key: "audio", html: `
+    <span class="chip">${ICONS.micSm}<span>${fmtTime(d.audioDuration)}</span>
+      <button class="chip-x" data-action="remove-audio" aria-label="Delete recording"><span>${ICONS.xChip}</span></button>
+    </span>` });
+  if (items.length) el.hidden = false;
+  morph(el, items, { exit: true, instant }).then(() => {
+    // Row is absent when nothing is attached (hidden once any chip has finished fading out)
+    if (!el.querySelector("[data-key]:not([data-leaving])")) el.hidden = true;
+  });
+}
+
+function renderTools(instant) {
+  const rec = state.capture.rec;
+  morph($("tools"), [rec
+    ? { key: "rec", html: `
+      <div class="rec-row">
+        <div class="rec-left">
+          <button class="btn-stop" data-action="stop" aria-label="Stop recording"><span></span></button>
+          <div class="meter" id="meter" aria-hidden="true">${"<i></i>".repeat(9)}</div>
+        </div>
+        <span class="rec-time" id="rec-time" role="timer">${fmtTime(rec.elapsed)}</span>
+      </div>` }
+    : { key: "buttons", html: `
+      <div class="tools-row">
+        <button class="btn-white btn-round" data-action="mic" aria-label="${state.draft.audioDuration ? "Record more" : "Record"}">${ICONS.mic}</button>
+        <label class="btn-white btn-round" for="photo-input" role="button" aria-label="${state.draft.photo ? "Replace photo" : "Add photo"}">${ICONS.photo}</label>
+        <button class="btn-white btn-round" data-action="place" aria-label="${state.draft.place ? "Change place" : "Add place"}">${ICONS.pin}</button>
+      </div>` }
+  ], { instant });
+}
+
+function renderChapter(instant) {
+  const c = state.capture, d = state.draft;
+  let item;
+  if (c.naming) item = { key: "edit", html: `
+      <div class="chapter-edit">
+        <div class="text-field">
+          <label for="chapter-name">Chapter name</label>
+          <input id="chapter-name" type="text" enterkeyhint="done" autocomplete="off" value="${esc(c.chapterInput)}">
+        </div>
+        <div class="chapter-actions">
+          <button class="btn-white btn-round" data-action="chapter-cancel" aria-label="Cancel">${ICONS.xBtn}</button>
+          <button class="btn-dark btn-round" data-action="chapter-confirm" aria-label="Add chapter">${ICONS.checkBtn}</button>
+        </div>
+      </div>` };
+  else if (d.chapter) item = { key: "pill", html: `
+      <span class="chapter-pill"><span>${esc(d.chapter)}</span>
+        <button class="chip-x" data-action="chapter-remove" aria-label="Remove chapter ${esc(d.chapter)}"><span>${ICONS.xChip}</span></button>
+      </span>` };
+  else item = { key: "add", html: `<button class="btn-white btn-chip" data-action="chapter-start" id="chapter-add">${ICONS.plusSm}<span>Add</span></button>` };
+  morph($("chapter"), [item], { instant });   // swaps in place: the new state fades and lifts in
+}
+
+function renderPublic(instant) {
+  const d = state.draft;
+  $("public-switch").setAttribute("aria-checked", d.public);   // knob slides by transform
+  morph($("attribution"), d.public ? [{ key: "choice", html: `
+      <div class="choice" role="radiogroup" aria-label="Post as">
+        <button role="radio" aria-checked="${!d.anonymous}" data-action="anonymous" data-value="false">As ${esc(myName())}</button>
+        <button role="radio" aria-checked="${d.anonymous}" data-action="anonymous" data-value="true">Anonymous</button>
+      </div>` }] : [], { exit: true, instant });
+}
+
+function renderAddButton() {
+  // The only disabled state in the composer: while recording
+  $("add-moment").disabled = !!state.capture.rec;
+}
+
+/* --- Chapter --- */
+function startChapter() {
+  state.capture.naming = true;
+  state.capture.chapterInput = "";
+  renderChapter();
+  $("chapter-name").focus();
+}
+function confirmChapter() {
+  const name = state.capture.chapterInput.trim();
+  if (!name) { $("chapter-name").focus(); return; }
+  state.draft.chapter = name;
+  state.capture.naming = false;
+  renderChapter();
+}
+function cancelChapter() {
+  state.capture.naming = false;
+  renderChapter();
+  $("chapter-add")?.focus();
+}
+
+/* --- Photo --- */
+function onPhotoPicked(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (state.draft.photo) URL.revokeObjectURL(state.draft.photo);
+  state.draft.photo = URL.createObjectURL(file);   // tapping photo again replaces it
+  e.target.value = "";
+  renderAttachments(); renderTools();
+}
+
+/* --- Place picker (in a bottom sheet) --- */
+function openPlaceSheet() {
+  const selected = state.draft.place;
+  const placeRow = name => `<li><button data-action="pick-place" data-value="${esc(name)}" aria-pressed="${name === selected}">
+      <span>${esc(name)}</span>${name === selected ? `<span class="place-check">${ICONS.checkSm}</span>` : ""}</button></li>`;
+
+  const listFor = query => {
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      // An attached place that isn't detected/nearby still shows, selected, at the top of the list
+      const names = [...PLACE_DATA.nearby];
+      if (selected && selected !== PLACE_DATA.detected && !names.includes(selected)) names.unshift(selected);
+      return `<h3 class="list-label">Nearby</h3><ul class="place-list">${names.map(placeRow).join("")}</ul>`;
+    }
+    const hits = PLACE_DATA.all
+      .filter(n => n.toLowerCase().includes(q))
+      .sort((a, b) => b.toLowerCase().startsWith(q) - a.toLowerCase().startsWith(q))
+      .slice(0, 8);
+    return `<h3 class="list-label">Towns and cities</h3>` + (hits.length
+      ? `<ul class="place-list">${hits.map(placeRow).join("")}</ul>`
+      : `<p class="place-empty">No towns or cities match “${esc(query.trim())}”</p>`);
+  };
+
+  const d = PLACE_DATA.detected, isSel = d === selected;
+  Sheet.open({
+    title: "Add a location",
+    body: `
+      <button class="place-current" data-action="pick-place" data-value="${esc(d)}" aria-pressed="${isSel}">
+        <span class="place-current-icon">${ICONS.currentLocation}</span>
+        <span class="place-current-text"><span class="place-name">${esc(d)}</span><span class="place-sub">Your current location</span></span>
+        ${isSel ? `<span class="place-check">${ICONS.checkSm}</span>` : ""}
+      </button>
+      <label class="search-field">${ICONS.searchSm}
+        <input type="search" id="place-search" placeholder="Search towns and cities" autocomplete="off" enterkeyhint="search" aria-label="Search towns and cities">
+      </label>
+      <div class="place-section" id="place-results">${listFor("")}</div>`,
+    onMount(body) {
+      const input = body.querySelector("#place-search"), results = body.querySelector("#place-results");
+      input.addEventListener("input", () => { results.innerHTML = listFor(input.value); });
+    },
+    returnFocus: () => document.querySelector('[data-action="place"]'),
+  });
+}
+
+function pickPlace(name) {
+  state.draft.place = name;   // replaces any place already attached
+  renderAttachments(); renderTools();
+  Sheet.close();
+}
+
+/* --- Recording (simulated speech-to-text) --- */
+function startRecording() {
+  const c = state.capture, ta = $("entry-text");
+  state.draft.text = ta.value;
+  c.rec = { started: Date.now(), elapsed: 0, base: state.draft.text, words: [] };
+  ta.hidden = true;
+  $("live-text").hidden = false;
+  updateLive();
+  renderTools(); renderAddButton();
+
+  c.rec.wordTimer = setInterval(() => {
+    c.rec.words.push(SPEECH[c.speechPos % SPEECH.length]);
+    c.speechPos++;
+    updateLive();
+  }, 380);
+  c.rec.tick = setInterval(() => {
+    c.rec.elapsed = Math.floor((Date.now() - c.rec.started) / 1000);
+    $("rec-time").textContent = fmtTime(c.rec.elapsed);
+    const level = () => (0.25 + Math.random() * 0.75).toFixed(2);
+    document.querySelectorAll("#meter i").forEach(b => {
+      if (reduceMotion.matches) b.style.opacity = level();       // no transforms with reduced motion
+      else b.style.transform = `scaleY(${level()})`;
+    });
+  }, 140);
+}
+
+function spokenText(rec) {
+  const sep = rec.base && !/\s$/.test(rec.base) && rec.words.length ? " " : "";
+  return rec.base + sep + rec.words.join(" ");
+}
+
+function updateLive() {
+  const rec = state.capture.rec;
+  const sep = rec.base && !/\s$/.test(rec.base) && rec.words.length ? " " : "";
+  const settled = rec.base + sep + rec.words.slice(0, -1).join(" ");
+  const interim = rec.words.length ? (rec.words.length > 1 ? " " : "") + rec.words[rec.words.length - 1] : "";
+  $("live-text").innerHTML = esc(settled) + `<span class="interim">${esc(interim)}</span><span class="caret"></span>`;
+}
+
+function stopRecording() {
+  const c = state.capture, rec = c.rec;
+  if (!rec) return;
+  clearInterval(rec.wordTimer); clearInterval(rec.tick);
+  const secs = Math.max(1, Math.round((Date.now() - rec.started) / 1000));
+  state.draft.text = spokenText(rec);                               // tapping mic again appends
+  state.draft.audioDuration = (state.draft.audioDuration || 0) + secs;
+  c.rec = null;
+  const ta = $("entry-text");
+  if (!ta) return;                                                 // navigated away mid-recording
+  ta.value = state.draft.text;
+  ta.hidden = false;
+  $("live-text").hidden = true;
+  autosize(ta);
+  renderAttachments(); renderTools(); renderAddButton();
+}
+
+/* --- Save --- */
+function addMoment() {
+  if (state.capture.rec) return;
+  const d = state.draft;
+  d.text = $("entry-text").value.trim();
+  if (!d.text && !d.audioDuration && !d.photo && !d.place) { $("entry-text").focus(); return; }
+  state.entries.unshift({ ...d, id: state.nextId++, own: true, createdAt: new Date() });
+  state.draft = newDraft();
+  state.capture.naming = false;
+  if (state.firstRun === "pending") {
+    state.firstRun = "play";   // the timeline plays its intro once, on this first arrival
+    state.scope = "yours";     // so the first entry is the one on screen
+  }
+  location.hash = "#timeline";
+}
+
+/* ============ First-run name screen ============
+   Shown once, before anything else. The name is remembered on this device so it never shows again.
+   (Add ?fresh to the URL to clear it and see the first run again.) */
+const NAME_KEY = "tyww-name";
+const store = {
+  get() { try { return localStorage.getItem(NAME_KEY); } catch (_) { return null; } },
+  set(v) { try { localStorage.setItem(NAME_KEY, v); } catch (_) {} },
+  clear() { try { localStorage.removeItem(NAME_KEY); } catch (_) {} },
+};
+
+screens.welcome = () => ({
+  hideTabbar: true,
+  html: `
+    <form class="welcome" id="welcome-form" novalidate>
+      <div class="welcome-main">
+        <span class="wordmark serif">TYWW</span>
+        <h1 class="h2 serif" id="welcome-title">What should we call you?</h1>
+        <div class="welcome-field">
+          <input id="welcome-name" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="done"
+                 maxlength="40" aria-labelledby="welcome-title">
+        </div>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn-dark btn-block" type="submit">Continue</button>
+        <button class="link" type="button" data-action="name-skip">Skip</button>
+      </div>
+    </form>`,
+  mount() {
+    $("welcome-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const v = $("welcome-name").value.trim();
+      if (!v) { $("welcome-name").focus(); return; }
+      setName(v);
+    });
+  },
+});
+
+function setName(name) {
+  state.name = name;
+  store.set(name);
+  location.replace("#timeline");   // replace, so Back never returns to the name screen
+}
+
+/* ============ Placeholder screens ============ */
+function placeholder(route) {
+  const name = route.charAt(0).toUpperCase() + route.slice(1);
+  return {
+    html: `<section class="placeholder">
+      <h1 class="h2 serif">${name}</h1>
+      <p>This screen hasn't been built yet.</p>
+      <a class="btn-white btn-pill" href="#timeline">${ICONS.back}<span>Back to timeline</span></a>
+    </section>`,
+  };
+}
+
+/* ============ Full moment view ============ */
+const findEntry = id => [...state.entries, ...OTHERS].find(x => String(x.id) === String(id));
+
+// "30th October 2026"
+function fmtLongDate(d) {
+  const n = d.getDate(), s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th");
+  return `${n}${s} ${d.toLocaleDateString("en-GB", { month: "long" })} ${d.getFullYear()}`;
+}
+
+// How many moments were recorded across everyone on that day — the same number the public month grid shows
+function dayCount(d) {
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  return Math.max(1, countFor(day, "public") || 0);
+}
+
+screens.day = dayScreen;
+
+const bookmarkBtn = id => {
+  const on = state.bookmarks.has(String(id));
+  return `<button class="btn-white btn-round" id="bookmark-btn" data-action="bookmark" data-value="${id}" aria-pressed="${on}" aria-label="${on ? "Remove bookmark" : "Bookmark"}">${on ? ICONS.bookmarkFilled : ICONS.bookmark}</button>`;
+};
+
+screens.moment = id => {
+  const e = findEntry(id);
+  if (!e) return placeholder("moment");
+  const metaParts = e.own ? [e.place].filter(Boolean) : [attribution(e)];
+  return {
+    html: `
+      ${topbar()}
+      <div class="moment-nav">
+        <button class="btn-dark btn-round" data-action="back" aria-label="Back">${ICONS.back}</button>
+        ${showChapter(e) ? `
+          <div class="moment-chapter">
+            <span class="moment-chapter-label">Belongs to chapter:</span>
+            <a class="btn-white" href="#chapter/${encodeURIComponent(e.chapter)}"><span>${esc(e.chapter)}</span>${ICONS.arrowRight}</a>
+          </div>` : ""}
+      </div>
+
+      <div class="moment-body">
+        <article class="moment-card" aria-labelledby="moment-date">
+          <div class="moment-main">
+            <h1 class="moment-date serif" id="moment-date">${fmtLongDate(e.createdAt)}</h1>
+            ${e.text ? `<p class="moment-text">${esc(e.text)}</p>` : ""}
+            ${e.photo ? `<div class="moment-photo">${typeof e.photo === "string" ? `<img src="${e.photo}" alt="Photo from this moment">` : `<span role="img" aria-label="Photo attached">${ICONS.photoLg}</span>`}</div>` : ""}
+            ${e.audioDuration ? audioBar(e) : ""}
+          </div>
+          <div class="moment-meta">
+            ${metaParts.map(t => `<span class="moment-place">${esc(t)}</span><span class="moment-dot" aria-hidden="true"></span>`).join("")}
+            <span class="moment-count">One of ${dayCount(e.createdAt)} recorded on this day</span>
+          </div>
+        </article>
+
+        <div class="moment-actions">
+          <button class="btn-white btn-round" data-action="share" data-value="${e.id}" aria-label="Share">${ICONS.share}</button>
+          ${e.own ? `<a class="btn-white btn-round" href="#edit/${e.id}" aria-label="Edit">${ICONS.edit}</a>` : ""}
+          ${bookmarkBtn(e.id)}
+          <button class="btn-white btn-round" data-action="moment-more" data-value="${e.id}" aria-label="More options">${ICONS.dots}</button>
+        </div>
+      </div>`,
+  };
+};
+
+function toast(message) {
+  document.querySelector(".toast-layer")?.remove();
+  const layer = document.createElement("div");
+  layer.className = "toast-layer";
+  layer.innerHTML = `<div class="toast" role="status">${esc(message)}</div>`;
+  document.body.appendChild(layer);
+  const t = layer.firstElementChild;
+  enter(t);
+  setTimeout(() => leave(t).finished.then(() => layer.remove(), () => layer.remove()), 1800);
+}
+
+/* --- Share: "Send this moment to someone you know" (bottom sheet) --- */
+// What gets sent is exactly the entry's text, followed by who and where it's from.
+function shareParts(e) {
+  const byline = e.own ? [myName(), e.place].filter(Boolean) : [attribution(e)];
+  return { text: e.text || cardLine(e), byline };
+}
+const shareMessage = e => { const p = shareParts(e); return `${p.text}\n\n— ${p.byline.join(" · ")}`; };
+const momentLink = e => `${location.origin}${location.pathname}#moment/${e.id}`;
+
+function shareMoment(id) {
+  const e = findEntry(id);
+  if (!e) return;
+  const { text, byline } = shareParts(e);
+  const msg = encodeURIComponent(shareMessage(e));
+  Sheet.open({
+    title: "Send this moment to someone you know",
+    closeLabel: "Close",
+    body: `<div class="share-body">
+      <div class="share-preview">
+        <p class="share-text">${esc(text)}</p>
+        <p class="share-by">${byline.map(esc).join('<span class="moment-dot" aria-hidden="true"></span>')}</p>
+      </div>
+      <div class="share-options">
+        <a class="share-option" href="https://wa.me/?text=${msg}" target="_blank" rel="noopener" data-action="share-done">${ICONS.whatsapp}<span>WhatsApp</span></a>
+        <a class="share-option" href="sms:&body=${msg}" data-action="share-done">${ICONS.message}<span>Message</span></a>
+        <button class="share-option" data-action="share-link" data-value="${e.id}">${ICONS.link}<span>Link</span></button>
+      </div>
+    </div>`,
+    returnFocus: () => document.querySelector('[data-action="share"]'),
+  });
+}
+
+async function copyMomentLink(id) {
+  const e = findEntry(id);
+  Sheet.close();
+  try { await navigator.clipboard.writeText(momentLink(e)); toast("Link copied"); }
+  catch (_) { toast("Couldn't copy the link"); }
+}
+
+function toggleBookmark(id) {
+  const k = String(id);
+  state.bookmarks.has(k) ? state.bookmarks.delete(k) : state.bookmarks.add(k);
+  $("bookmark-btn").outerHTML = bookmarkBtn(id);
+  toast(state.bookmarks.has(k) ? "Bookmarked" : "Bookmark removed");
+}
+
+// ⋮ opens the reusable bottom sheet with more options
+/* ============ Filters (personal timeline, day view) ============ */
+const WITH_OPTIONS = [["audio", "Recording"], ["photo", "Photo"], ["place", "Location"]];
+const VIS_OPTIONS = [["private", "Private Only"], ["public", "Shared Publicly"]];
+
+function applyFilters(list) {
+  const f = state.filters;
+  return list.filter(e =>
+    (f.chapters.size === 0 || f.chapters.has(e.chapter)) &&
+    [...f.with].every(k => k === "audio" ? !!e.audioDuration : !!e[k]) &&
+    (!f.visibility || (f.visibility === "public" ? !!e.public : !e.public)));
+}
+function filterCount() {
+  const f = state.filters;
+  return f.chapters.size + f.with.size + (f.visibility ? 1 : 0) + (f.predictions ? 1 : 0);
+}
+
+function filterBodyHTML() {
+  const f = state.filters;
+  const chapters = [...new Set(state.entries.map(e => e.chapter).filter(Boolean))].sort();
+  const chip = (action, value, label, on) => `<button data-action="${action}" data-value="${esc(value)}" aria-pressed="${on}">${esc(label)}</button>`;
+  const n = filterCount();
+  return `
+    <div class="filter-group">
+      <h3 class="filter-label">Chapter</h3>
+      ${chapters.length
+        ? `<div class="filter-chips">${chapters.map(c => chip("filter-chapter", c, c, f.chapters.has(c))).join("")}</div>`
+        : `<p class="filter-none">No chapter created</p>`}
+    </div>
+    <div class="filter-group">
+      <h3 class="filter-label">Entries with</h3>
+      <div class="filter-chips">${WITH_OPTIONS.map(([k, l]) => chip("filter-with", k, l, f.with.has(k))).join("")}</div>
+    </div>
+    <div class="filter-group">
+      <h3 class="filter-label">Visibility</h3>
+      <div class="filter-chips">${VIS_OPTIONS.map(([k, l]) => chip("filter-vis", k, l, f.visibility === k)).join("")}</div>
+    </div>
+    <div class="filter-row">
+      <h3 class="filter-label" id="pred-label">Include predictions</h3>
+      <button class="switch" role="switch" aria-checked="${f.predictions}" aria-labelledby="pred-label" data-action="filter-predictions">
+        <span class="switch-track"><span class="switch-knob"></span></span>
+      </button>
+    </div>
+    <div class="filter-foot">
+      <button class="link" data-action="filters-clear">Clear All</button>
+      <span class="filter-count" role="status">${n} ${n === 1 ? "filter" : "filters"} applied</span>
+    </div>`;
+}
+
+function openFilters() {
+  Sheet.open({
+    title: "Filters",
+    closeLabel: "Close",
+    body: `<div class="filter-body" id="filter-body">${filterBodyHTML()}</div>`,
+    returnFocus: () => document.querySelector('[data-action="open-filters"]'),
+  });
+}
+
+// Filters apply live: the timeline behind the sheet updates as you tap
+function updateFilters(focusAction, focusValue) {
+  const body = $("filter-body");
+  if (body && focusAction === "filter-predictions") {
+    // Update the switch in place so its knob slides; just refresh the count
+    body.querySelector('[data-action="filter-predictions"]').setAttribute("aria-checked", state.filters.predictions);
+    const n = filterCount();
+    body.querySelector(".filter-count").textContent = `${n} ${n === 1 ? "filter" : "filters"} applied`;
+  } else if (body) {
+    body.innerHTML = filterBodyHTML();
+    const sel = `[data-action="${focusAction}"]${focusValue != null ? `[data-value="${CSS.escape(focusValue)}"]` : ""}`;
+    body.querySelector(sel)?.focus({ preventScroll: true });
+  }
+  render();
+}
+
+function openMomentMore(id) {
+  const e = findEntry(id);
+  if (!e) return;
+  Sheet.open({
+    title: "Moment",
+    body: `<div class="sheet-options" id="more-options">
+      <button data-action="copy-text" data-value="${e.id}">${ICONS.copy}<span>Copy text</span></button>
+      ${e.own ? `<button class="danger" data-action="delete-ask" data-value="${e.id}" data-key="delete">${ICONS.trash}<span>Delete moment</span></button>` : ""}
+    </div>`,
+    returnFocus: () => document.querySelector('[data-action="moment-more"]'),
+  });
+}
+
+function askDelete(id) {
+  // Swap the option in place for an explicit confirmation
+  const opt = document.querySelector('[data-action="delete-ask"]');
+  const confirm = fromHTML(`<button class="danger" data-action="delete-confirm" data-value="${id}">${ICONS.trash}<span>Delete — this can't be undone</span></button>`, "confirm");
+  opt.replaceWith(confirm);
+  enter(confirm);
+  confirm.focus();
+}
+
+function deleteMoment(id) {
+  state.entries = state.entries.filter(x => String(x.id) !== String(id));
+  state.bookmarks.delete(String(id));
+  Sheet.close(true);
+  location.hash = "#timeline";
+  setTimeout(() => toast("Moment deleted"), 50);
+}
+
+/* ============ Router ============ */
+const TAB_ROUTES = TABS.map(t => t.route);
+let currentRoute = null, previousRoute = null;
+
+// Routes can carry a parameter: "#moment/3" → name "moment", param "3"
+const routeName = r => (r || "").split("/")[0];
+// Tabs sit at depth 0; capture and anything opened from a screen sit at depth 1.
+// The name screen sits at depth 0 too, so leaving it fades into the timeline rather than sliding.
+const depthOf = r => routeName(r) === "welcome" ? 0 : (routeName(r) === "capture" || !TAB_ROUTES.includes(routeName(r))) ? 1 : 0;
+let screenAnims = [];
+const scrollMemory = {};
+
+/* render(mode): mode is "forward" | "back" | "fade" (tab switch) | undefined (same screen, no animation).
+   Each screen is a .layer in the #stage grid; during a transition the old and new layers overlap. */
+function render(mode) {
+  const route = location.hash.slice(1) || "timeline";
+  const stage = $("stage");
+
+  // Settle any transition still running
+  screenAnims.forEach(a => a.finish());
+  screenAnims = [];
+  stage.querySelectorAll(".layer.leaving").forEach(l => l.remove());
+
+  const old = stage.querySelector(".layer");
+  const scrollY = window.scrollY;
+  const [name, ...params] = route.split("/");
+  const view = screens[name] ? screens[name](...params) : placeholder(name);
+  const layer = document.createElement("div");
+  layer.className = "layer";
+  layer.innerHTML = `
+    <main id="screen" class="screen" tabindex="-1">${view.html}</main>
+    <div class="dock">
+      <div id="dock-actions" class="dock-actions">${view.actions || ""}</div>
+      <nav id="tabbar" class="tabbar" aria-label="Main"></nav>
+    </div>`;
+
+  const animated = old && (mode === "forward" || mode === "back");
+  if (animated) {
+    old.classList.add("leaving");
+    old.inert = true;
+    old.setAttribute("aria-hidden", "true");
+    old.querySelectorAll("[id]").forEach(n => n.removeAttribute("id"));
+  } else if (old) {
+    old.remove();
+  }
+  // Back: the new screen sits underneath while the old one slides away
+  if (animated && mode === "back") stage.insertBefore(layer, old); else stage.appendChild(layer);
+
+  renderTabbar(TAB_ROUTES.includes(name) ? name : "timeline", view.hideTabbar);
+  // New screens start at the top; going back returns to where you were (e.g. deep in the month scroll)
+  let newScroll = scrollY;
+  if (route !== currentRoute) {
+    if (currentRoute) scrollMemory[currentRoute] = scrollY;
+    newScroll = mode === "back" ? (scrollMemory[route] || 0) : 0;
+    window.scrollTo(0, newScroll);
+    // Switching view within the same screen (e.g. a day as Public → Yours) keeps the screen you came from
+    if (routeName(route) !== routeName(currentRoute)) previousRoute = currentRoute;
+    currentRoute = route;
+  }
+  view.mount && view.mount();
+  if (newScroll && window.scrollY !== newScroll) window.scrollTo(0, newScroll);
+
+  if (animated) {
+    // Keep the old screen where it was on the page while the page scroll changes under it
+    const shift = newScroll - scrollY;
+    const hold = shift ? ` translateY(${shift}px)` : "";
+    let anim;
+    if (mode === "forward") {
+      if (hold) old.style.transform = hold.trim();
+      layer.classList.add("moving");
+      anim = motion(layer, [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }],
+        { duration: 280, easing: EASE_OUT }, [{ opacity: 0 }, { opacity: 1 }]);
+    } else {
+      old.classList.add("moving");
+      anim = motion(old, [{ transform: `translateX(0)${hold}` }, { transform: `translateX(100%)${hold}` }],
+        { duration: 240, easing: EASE_IN, fill: "forwards" }, [{ opacity: 1 }, { opacity: 0 }]);
+    }
+    screenAnims.push(anim);
+    const done = () => { old.remove(); layer.classList.remove("moving"); };
+    anim.finished.then(done, done);
+  } else if (mode === "fade") {
+    enter(layer);
+  }
+}
+
+window.addEventListener("hashchange", () => {
+  stopRecording();
+  stopPlayback();
+  Sheet.close(true);
+  state.menuOpen = null;
+  const next = location.hash.slice(1) || "timeline";
+  const from = depthOf(currentRoute), to = depthOf(next);
+  render(currentRoute === null || next === currentRoute ? undefined : to > from ? "forward" : to < from ? "back" : "fade");
+});
+
+// Chapter name field: Enter confirms, Escape cancels
+document.addEventListener("input", e => { if (e.target.id === "chapter-name") state.capture.chapterInput = e.target.value; });
+document.addEventListener("keydown", e => {
+  if (e.target.id !== "chapter-name") return;
+  if (e.key === "Enter") { e.preventDefault(); confirmChapter(); }
+  if (e.key === "Escape") cancelChapter();
+});
+// Lets :active (button press) fire on iOS Safari
+document.addEventListener("touchstart", () => {}, { passive: true });
+
+/* ============ Actions ============ */
+const ACTIONS = {
+  // timeline
+  "scope":        v => {
+    state.scope = v;
+    // A day opened as Public from "View full timeline": choosing a view here drops that override
+    const [name, key, forced] = (currentRoute || "").split("/");
+    if (name === "day" && forced) location.replace(`#day/${key}`);
+    else render();
+  },
+  "toggle-menu":  v => {
+    state.menuOpen = state.menuOpen === v ? null : v;
+    render();
+    const menu = document.querySelector(".menu:not([hidden])");
+    if (menu) enter(menu);
+  },
+  "viewby":       v => { state.viewBy = v; state.menuOpen = null; render(); },
+  "open-moment":  v => { location.hash = `#moment/${v}`; },
+  "open-day":     v => { location.hash = `#day/${v}`; },    // keeps the Yours / Public / Both setting
+  // filters
+  "name-skip":      () => setName("You"),
+  "open-filters":   () => openFilters(),
+  "filter-chapter": v => { const s = state.filters.chapters; s.has(v) ? s.delete(v) : s.add(v); updateFilters("filter-chapter", v); },
+  "filter-with":    v => { const s = state.filters.with; s.has(v) ? s.delete(v) : s.add(v); updateFilters("filter-with", v); },
+  "filter-vis":     v => { state.filters.visibility = state.filters.visibility === v ? null : v; updateFilters("filter-vis", v); },
+  "filter-predictions": () => { state.filters.predictions = !state.filters.predictions; updateFilters("filter-predictions"); },
+  // chapter view
+  "chapter-exit":   () => { state.filters.chapters.clear(); updateFilters("open-filters"); },
+  "chapter-close":  v => {
+    if (state.closedChapters[v]) delete state.closedChapters[v]; else state.closedChapters[v] = new Date();
+    render();
+    toast(state.closedChapters[v] ? "Chapter closed" : "Chapter reopened");
+  },
+  "filters-clear":  () => {
+    const f = state.filters; f.chapters.clear(); f.with.clear(); f.visibility = null; f.predictions = false;
+    updateFilters("filters-clear");
+  },
+  "play":         v => togglePlay(v),
+  // moment view
+  "share":        v => shareMoment(v),
+  "share-link":   v => copyMomentLink(v),
+  "share-done":   () => setTimeout(() => Sheet.close(), 300),   // let the link open WhatsApp/Messages, then tidy up
+  "bookmark":     v => toggleBookmark(v),
+  "card-bookmark": v => {
+    const k = String(v);
+    state.bookmarks.has(k) ? state.bookmarks.delete(k) : state.bookmarks.add(k);
+    $(`card-bm-${v}`).outerHTML = cardBookmark(v);
+    $(`card-bm-${v}`).focus({ preventScroll: true });
+    toast(state.bookmarks.has(k) ? "Bookmarked" : "Bookmark removed");
+  },
+  "moment-more":  v => openMomentMore(v),
+  "copy-text":    v => { const e = findEntry(v); Sheet.close(); navigator.clipboard?.writeText(e?.text || "").then(() => toast("Text copied"), () => toast("Couldn't copy")); },
+  "delete-ask":   v => askDelete(v),
+  "delete-confirm": v => deleteMoment(v),
+  // capture
+  "back":         () => { location.hash = "#" + (previousRoute && previousRoute !== "capture" ? previousRoute : "timeline"); },
+  "change-prompt":() => { const c = state.capture; c.promptIndex = (c.promptIndex + 1) % PROMPTS.length; $("prompt").textContent = PROMPTS[c.promptIndex]; },
+  "mic":          () => startRecording(),
+  "stop":         () => stopRecording(),
+  "place":        () => openPlaceSheet(),
+  "pick-place":   v => pickPlace(v),
+  "remove-photo": () => { URL.revokeObjectURL(state.draft.photo); state.draft.photo = null; renderAttachments(); renderTools(); },
+  "remove-place": () => { state.draft.place = null; renderAttachments(); renderTools(); },
+  "remove-audio": () => { state.draft.audioDuration = null; renderAttachments(); renderTools(); },  // words stay
+  "chapter-start":   () => startChapter(),
+  "chapter-confirm": () => confirmChapter(),
+  "chapter-cancel":  () => cancelChapter(),
+  "chapter-remove":  () => { state.draft.chapter = null; renderChapter(); $("chapter-add").focus(); },
+  "toggle-public":   () => { state.draft.public = !state.draft.public; renderPublic(); },
+  "anonymous":    v => { state.draft.anonymous = v === "true"; renderPublic(); },
+  "add-moment":   () => addMoment(),
+};
+
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-action]");
+  if (state.menuOpen && !e.target.closest(".menu") && !(el && el.dataset.action === "toggle-menu")) {
+    state.menuOpen = null;
+    if (!el) { render(); return; }
+  }
+  if (!el || el.disabled) return;
+  ACTIONS[el.dataset.action]?.(el.dataset.value, el);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && state.menuOpen) { state.menuOpen = null; render(); }
+});
+
+// First run: ask for a name before anything else (once, ever, on this device)
+if (new URLSearchParams(location.search).has("fresh")) store.clear();
+state.name = store.get();
+if (!state.name) history.replaceState(null, "", "#welcome");
+else if (!location.hash || location.hash === "#welcome") history.replaceState(null, "", "#timeline");
+render();
+</script>
+</body>
+</html>
