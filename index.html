@@ -1816,33 +1816,85 @@ function pickPlace(name) {
 const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder && window.isSecureContext);
 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-async function startRecording() {
+// Safari only lets speech recognition start inside the tap itself, so it starts first (synchronously),
+// before asking for the microphone stream.
+function startRecording() {
   const c = state.capture, ta = $("entry-text");
   if (c.rec || c.starting) return;
   state.draft.text = ta.value;
-  let stream = null;
-  if (canRecord) {
-    c.starting = true;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (err) {
-      c.starting = false;
-      toast(err && err.name === "NotAllowedError" ? "Allow microphone access to record" : "Couldn't start the microphone");
-      return;
+  const rec = { started: Date.now(), elapsed: 0, base: state.draft.text, words: [], chunks: [] };
+  if (!canRecord) { beginRecording(rec); return; }              // simulation (no mic available)
+  if (Speech) startSpeech(rec);
+  c.starting = rec;
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    if (c.starting !== rec || !$("entry-text")) {               // cancelled or left the screen meanwhile
+      stream.getTracks().forEach(t => t.stop()); stopSpeech(rec); return;
     }
-    c.starting = false;
-    if (!$("entry-text")) { stream.getTracks().forEach(t => t.stop()); return; }   // left the screen meanwhile
-  }
+    c.starting = null;
+    rec.stream = stream;
+    beginRecording(rec);
+  }, err => {
+    c.starting = null;
+    stopSpeech(rec);
+    toast(err && err.name === "NotAllowedError" ? "Allow microphone access to record" : "Couldn't start the microphone");
+  });
+}
 
-  c.rec = { started: Date.now(), elapsed: 0, base: state.draft.text, words: [], stream, chunks: [], live: !!stream };
-  const rec = c.rec;
+const SPEECH_FATAL = ["not-allowed", "service-not-allowed", "audio-capture", "language-not-supported", "network"];
+function startSpeech(rec) {
+  rec.finalText = "";
+  rec.speechOn = true;
+  const active = () => rec.speechOn && (state.capture.rec === rec || state.capture.starting === rec);
+  const listen = () => {
+    const sr = new Speech();
+    sr.lang = /^en/i.test(navigator.language) ? navigator.language : "en-GB";
+    sr.continuous = true;
+    sr.interimResults = true;
+    sr.onresult = ev => {
+      let interim = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) rec.finalText += r[0].transcript.trim() + " ";
+        else interim += r[0].transcript;
+      }
+      rec.words = (rec.finalText + interim).trim().split(/\s+/).filter(Boolean);
+      rec.heard = true;
+      if (state.capture.rec === rec) updateLive();
+    };
+    sr.onerror = ev => {
+      if (!SPEECH_FATAL.includes(ev.error)) return;             // "no-speech" / "aborted": just listen again
+      rec.speechOn = false;
+      if (state.capture.rec === rec || state.capture.starting === rec)
+        toast(ev.error === "not-allowed" || ev.error === "service-not-allowed"
+          ? "Turn on Dictation (Settings › General › Keyboard) for live words"
+          : "Live words aren't available here — recording audio only");
+    };
+    sr.onend = () => {
+      // Safari ends recognition after a pause; carry on while still recording (keeping the words so far)
+      if (active()) setTimeout(() => { if (active()) listen(); }, 60);
+    };
+    rec.sr = sr;
+    try { sr.start(); } catch (_) { rec.speechOn = false; }
+  };
+  listen();
+}
+function stopSpeech(rec) {
+  rec.speechOn = false;
+  if (rec.sr) { try { rec.sr.stop(); } catch (_) {} }
+}
+
+function beginRecording(rec) {
+  const c = state.capture, ta = $("entry-text");
+  c.rec = rec;
+  rec.started = Date.now();
   ta.hidden = true;
   $("live-text").hidden = false;
   updateLive();
   renderTools(); renderAddButton();
 
-  if (stream) {
+  if (rec.stream) {
     // Audio
-    rec.recorder = new MediaRecorder(stream);
+    rec.recorder = new MediaRecorder(rec.stream);
     rec.recorder.ondataavailable = ev => { if (ev.data && ev.data.size) rec.chunks.push(ev.data); };
     rec.recorder.start();
     // Level meter
@@ -1851,33 +1903,9 @@ async function startRecording() {
       rec.ctx = new AC();
       rec.analyser = rec.ctx.createAnalyser();
       rec.analyser.fftSize = 512;
-      rec.ctx.createMediaStreamSource(stream).connect(rec.analyser);
+      rec.ctx.createMediaStreamSource(rec.stream).connect(rec.analyser);
       rec.levels = new Uint8Array(rec.analyser.fftSize);
     } catch (_) {}
-    // Words
-    if (Speech) {
-      let finalText = "";
-      const listen = () => {
-        if (state.capture.rec !== rec) return;
-        const sr = new Speech();
-        sr.lang = "en-IE"; sr.continuous = true; sr.interimResults = true;
-        sr.onresult = ev => {
-          let interim = "";
-          for (let i = ev.resultIndex; i < ev.results.length; i++) {
-            const r = ev.results[i];
-            if (r.isFinal) finalText += r[0].transcript + " ";
-            else interim += r[0].transcript;
-          }
-          rec.words = (finalText + interim).trim().split(/\s+/).filter(Boolean);
-          if (state.capture.rec === rec) updateLive();
-        };
-        sr.onerror = ev => { if (ev.error === "not-allowed" || ev.error === "service-not-allowed") rec.noSpeech = true; };
-        sr.onend = () => { if (!rec.noSpeech) setTimeout(listen, 50); };   // Safari stops after pauses; pick up again
-        rec.sr = sr;
-        try { sr.start(); } catch (_) {}
-      };
-      listen();
-    }
   } else {
     rec.wordTimer = setInterval(() => {
       rec.words.push(SPEECH[c.speechPos % SPEECH.length]);
@@ -1919,10 +1947,11 @@ function updateLive() {
 
 function stopRecording() {
   const c = state.capture, rec = c.rec;
+  c.starting = null;                                               // cancels a start still waiting on the mic
   if (!rec) return;
   clearInterval(rec.wordTimer); clearInterval(rec.tick);
   const secs = Math.max(1, Math.round((Date.now() - rec.started) / 1000));
-  if (rec.sr) { rec.noSpeech = true; try { rec.sr.stop(); } catch (_) {} }
+  stopSpeech(rec);
   if (rec.ctx) rec.ctx.close().catch(() => {});
   const draft = state.draft;
   if (rec.recorder && rec.recorder.state !== "inactive") {
