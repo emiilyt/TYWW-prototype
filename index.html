@@ -1815,6 +1815,12 @@ function pickPlace(name) {
    If the mic isn't available at all (e.g. opened from a file), it falls back to the simulation. */
 const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder && window.isSecureContext);
 const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+// On phones (iPhone/iPad Safari, Android Chrome) the browser can't transcribe while the page also holds the mic
+// for audio: the words never arrive.
+// There, transcription wins: words appear live, and the voice note keeps its length but not the sound.
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/i.test(navigator.userAgent);
+const isPhone = isIOS || isAndroid;
 
 // Safari only lets speech recognition start inside the tap itself, so it starts first (synchronously),
 // before asking for the microphone stream.
@@ -1823,8 +1829,13 @@ function startRecording() {
   if (c.rec || c.starting) return;
   state.draft.text = ta.value;
   const rec = { started: Date.now(), elapsed: 0, base: state.draft.text, words: [], chunks: [] };
-  if (!canRecord) { beginRecording(rec); return; }              // simulation (no mic available)
+  if (!canRecord && !Speech) { rec.simulate = true; beginRecording(rec); return; }   // no mic at all: simulation
   if (Speech) startSpeech(rec);
+  if (Speech && (isPhone || !canRecord)) { beginRecording(rec); return; }             // words only
+  if (!Speech && isPhone && !state.capture.speechWarned) {                            // e.g. Samsung Internet
+    state.capture.speechWarned = true;
+    toast("Live words need Chrome — open this link in Chrome. Recording audio only.");
+  }
   c.starting = rec;
   navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
     if (c.starting !== rec || !$("entry-text")) {               // cancelled or left the screen meanwhile
@@ -1844,11 +1855,12 @@ const SPEECH_FATAL = ["not-allowed", "service-not-allowed", "audio-capture", "la
 function startSpeech(rec) {
   rec.finalText = "";
   rec.speechOn = true;
+  rec.speechTried = true;
   const active = () => rec.speechOn && (state.capture.rec === rec || state.capture.starting === rec);
   const listen = () => {
     const sr = new Speech();
     sr.lang = /^en/i.test(navigator.language) ? navigator.language : "en-GB";
-    sr.continuous = true;
+    sr.continuous = !isAndroid;   // Android Chrome repeats words in continuous mode; one phrase at a time, restarted
     sr.interimResults = true;
     sr.onresult = ev => {
       let interim = "";
@@ -1864,6 +1876,7 @@ function startSpeech(rec) {
     sr.onerror = ev => {
       if (!SPEECH_FATAL.includes(ev.error)) return;             // "no-speech" / "aborted": just listen again
       rec.speechOn = false;
+      rec.warned = true;
       if (state.capture.rec === rec || state.capture.starting === rec)
         toast(ev.error === "not-allowed" || ev.error === "service-not-allowed"
           ? "Turn on Dictation (Settings › General › Keyboard) for live words"
@@ -1906,7 +1919,7 @@ function beginRecording(rec) {
       rec.ctx.createMediaStreamSource(rec.stream).connect(rec.analyser);
       rec.levels = new Uint8Array(rec.analyser.fftSize);
     } catch (_) {}
-  } else {
+  } else if (rec.simulate) {
     rec.wordTimer = setInterval(() => {
       rec.words.push(SPEECH[c.speechPos % SPEECH.length]);
       c.speechPos++;
@@ -1966,6 +1979,8 @@ function stopRecording() {
     rec.recorder.stop();
   } else if (rec.stream) rec.stream.getTracks().forEach(t => t.stop());
   draft.text = spokenText(rec);                               // tapping mic again appends
+  if (rec.speechTried && !rec.heard && !rec.warned && secs >= 3)
+    toast("No words came through. Check Dictation is on in Settings › General › Keyboard");
   draft.audioDuration = (draft.audioDuration || 0) + secs;
   c.rec = null;
   const ta = $("entry-text");
