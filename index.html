@@ -2010,15 +2010,9 @@ function addMoment() {
   location.hash = "#timeline";
 }
 
-/* ============ First-run name screen ============
-   Shown once, before anything else. The name is remembered on this device so it never shows again.
-   (Add ?fresh to the URL to clear it and see the first run again.) */
-const NAME_KEY = "tyww-name";
-const store = {
-  get() { try { return localStorage.getItem(NAME_KEY); } catch (_) { return null; } },
-  set(v) { try { localStorage.setItem(NAME_KEY, v); } catch (_) {} },
-  clear() { try { localStorage.removeItem(NAME_KEY); } catch (_) {} },
-};
+/* ============ Name screen ============
+   Shown every time the page loads or reloads, before anything else. The name lives in memory only. */
+try { localStorage.removeItem("tyww-name"); } catch (_) {}   // clear the name older versions saved
 
 screens.welcome = () => ({
   hideTabbar: true,
@@ -2049,7 +2043,6 @@ screens.welcome = () => ({
 
 function setName(name) {
   state.name = name;
-  store.set(name);
   location.replace("#timeline");   // replace, so Back never returns to the name screen
 }
 
@@ -2479,11 +2472,9 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && state.menuOpen) { state.menuOpen = null; render(); }
 });
 
-// First run: ask for a name before anything else (once, ever, on this device)
-if (new URLSearchParams(location.search).has("fresh")) store.clear();
-state.name = store.get();
-if (!state.name) history.replaceState(null, "", "#welcome");
-else if (!location.hash || location.hash === "#welcome") history.replaceState(null, "", "#timeline");
+// Every load starts on the name screen
+state.name = null;
+history.replaceState(null, "", location.pathname + location.search + "#welcome");
 render();
 </script>
 </body>
