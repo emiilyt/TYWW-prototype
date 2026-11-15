@@ -6,6 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#f9f9f7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TYWW">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>The Year We Were</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -147,9 +152,17 @@ svg { display: block; }
 /* ============================================================
    ONBOARDING
    ============================================================ */
+/* Onboarding fits one screen: the illustration card gives up height first
+   (down to --illo-min) so the title, copy and Continue always stay visible. */
 .onb-body {
+  --illo-min: 150px;
+  --illo-gap: 15px;      /* brand → card */
+  --progress-gap: 25px;  /* card → progress */
+  --copy-gap: 36px;      /* progress → copy */
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;               /* horizontal drags go to the carousel */
@@ -167,19 +180,29 @@ svg { display: block; }
   padding: 0 var(--gutter);
 }
 
-.illo-row { margin-top: 15px; }
+.onb-body > * { flex: none; }
+.illo-row {
+  /* square on tall screens; shrinks in height on short ones */
+  flex: 0 1 calc(min(100vw, var(--app-max)) - 2 * var(--gutter));
+  min-height: var(--illo-min);
+  margin-top: var(--illo-gap);
+}
+.illo-row .track, .illo-row .slide { height: 100%; }
 .illo {
-  aspect-ratio: 1 / 1;
+  display: flex;
+  justify-content: center;
   width: 100%;
+  height: 100%;
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
-.illo svg { width: 100%; height: 100%; }
+/* artwork stays square and centred; the card colour fills any extra width */
+.illo svg { height: 100%; width: auto; max-width: 100%; aspect-ratio: 1 / 1; }
 
 .progress {
   display: flex;
   gap: 4px;
-  padding: 25px var(--gutter) 0;
+  padding: var(--progress-gap) var(--gutter) 0;
 }
 .progress button {
   flex: 1;
@@ -193,7 +216,23 @@ svg { display: block; }
 .progress button::after { content: ""; position: absolute; inset: -12px 0; }
 .progress button[aria-current="step"] { background: var(--navy); }
 
-.copy-row { padding: 36px 0 var(--s-8); }
+.copy-row { padding: var(--copy-gap) 0 var(--s-8); }
+
+/* Short screens (e.g. iPhone Safari with its toolbars): tighten the gaps */
+@media (max-height: 760px) {
+  .onb-body { --illo-gap: 8px; --progress-gap: 16px; --copy-gap: 16px; }
+  .brand { padding-top: 12px; }
+  .footer.onb-footer { padding-top: var(--s-24); }
+}
+/* Very short screens (e.g. iPhone SE in Safari): compact type + button */
+@media (max-height: 600px) {
+  .onb-body { --illo-min: 110px; --copy-gap: 12px; }
+  .copy .count { line-height: 28px; }
+  .copy h2 { font-size: 26px; line-height: 30px; }
+  .copy { gap: 12px; }
+  .footer.onb-footer { padding-top: var(--s-16); padding-bottom: max(var(--s-16), calc(var(--safe-bottom) + 8px)); }
+  .onb-footer .btn-primary { min-height: 56px; }
+}
 .copy { display: flex; flex-direction: column; gap: var(--s-16); max-width: 337px; }
 .copy.wide { max-width: none; }
 .copy-head { display: flex; flex-direction: column; gap: var(--s-4); }
@@ -281,13 +320,13 @@ const ILLOS = [
   /* 2 — Chapters: folders in a box */
   `<svg viewBox="0 0 392 392" aria-hidden="true">
     <rect width="392" height="392" fill="var(--lilac)"/>
-    <rect x="178.27" y="178.36" width="95.73"  height="82.64" rx="4" fill="var(--honey)"/>
-    <rect x="221.07" y="173.64" width="39.42"  height="12.99" rx="4" fill="var(--honey)"/>
-    <rect x="136.45" y="178.36" width="109.67" height="82.64" rx="4" fill="var(--paper)"/>
-    <rect x="185.48" y="173.64" width="45.16"  height="12.99" rx="4" fill="var(--paper)"/>
-    <rect x="114"    y="150.36" width="109.67" height="82.64" rx="4" fill="var(--sky)"/>
-    <rect x="163.03" y="145.64" width="45.16"  height="12.99" rx="4" fill="var(--sky)"/>
-    <svg x="73" y="189" width="252" height="134" overflow="hidden"><image href="${IMG.i2}" x="-52.16" y="-196.99" width="358.32" height="513" preserveAspectRatio="none"/></svg>
+    <rect x="179.27" y="141.74" width="113.34" height="97.85" rx="4" fill="var(--honey)"/>
+    <rect x="229.94" y="136.15" width="46.67"  height="15.38" rx="4" fill="var(--honey)"/>
+    <rect x="129.75" y="141.74" width="129.85" height="97.85" rx="4" fill="var(--paper)"/>
+    <rect x="187.8"  y="136.15" width="53.47"  height="15.38" rx="4" fill="var(--paper)"/>
+    <rect x="103.18" y="108.59" width="129.85" height="97.85" rx="4" fill="var(--sky)"/>
+    <rect x="161.23" y="103"    width="53.47"  height="15.38" rx="4" fill="var(--sky)"/>
+    <svg x="55" y="154" width="298" height="159" overflow="hidden"><image href="${IMG.i2}" x="-61.69" y="-233.75" width="423.73" height="608.72" preserveAspectRatio="none"/></svg>
   </svg>`,
 
   /* 3 — Write it or say it: voice note + written note */
@@ -308,13 +347,16 @@ const ILLOS = [
   </svg>`,
 ];
 
+/* card colour per slide (fills the card when it's wider than the square artwork) */
+const CARD_BG = ["--sun", "--lilac", "--sky", "--butter"];
+
 const SLIDES = [
   {
     title: "Welcome to<br>The Year We Were!",
     body: "A new job. A holiday. A first day at school. The Year We Were is for keeping the things while they’re happening — and they build into a timeline that keeps going.",
   },
   {
-    title: "Create chapters for your timeline, get it back when its over",
+    title: "Start a chapter. Get it back when it ends.",
     body: "Chapters on your timeline help mark different events in your life that may be unfolding. When you close a chapter, the whole thing comes back — every entry, in order, and how many days you marked.",
     wide: true,
   },
@@ -340,7 +382,7 @@ function Onboarding(root) {
         <div class="track" data-track>
           ${ILLOS.map((svg, i) => `
             <div class="slide" aria-hidden="${i !== state.onboardingIndex}">
-              <div class="illo">${svg}</div>
+              <div class="illo" style="background: var(${CARD_BG[i]})">${svg}</div>
             </div>`).join("")}
         </div>
       </section>
@@ -362,7 +404,7 @@ function Onboarding(root) {
         </div>
       </div>
     </div>
-    <div class="footer">
+    <div class="footer onb-footer">
       <button class="btn-primary" id="onb-continue">Continue</button>
     </div>`;
 
