@@ -1509,7 +1509,7 @@ function ChapterSetup(root) {
             <span class="label" id="end-label">End date</span>
             <button type="button" class="input strong" id="ch-end" aria-haspopup="menu" aria-expanded="false" aria-labelledby="end-label ch-end"></button>
             <div class="menu" id="end-menu" role="menu" hidden>
-              <button type="button" role="menuitemradio" data-end="open">Leave open for now ${ICON.check}</button>
+              <button type="button" role="menuitemradio" data-end="open">Leave open ${ICON.check}</button>
               <button type="button" role="menuitemradio" data-end="pick">Select end date ${ICON.check}</button>
             </div>
           </div>
@@ -1539,7 +1539,7 @@ function ChapterSetup(root) {
       c.querySelector(".btn-select").setAttribute("aria-pressed", on);
     });
     startBtn.textContent = fmtDate(draft.start);
-    endBtn.innerHTML = `<span>${draft.end ? fmtDate(draft.end) : "Leave open for now"}</span>${ICON.chevDown}`;
+    endBtn.innerHTML = `<span>${draft.end ? fmtDate(draft.end) : "Leave Open"}</span>${ICON.chevDown}`;
     endMenu.querySelector('[data-end="open"]').setAttribute("aria-checked", !draft.end);
     endMenu.querySelector('[data-end="pick"]').setAttribute("aria-checked", !!draft.end);
   }
