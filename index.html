@@ -32,6 +32,16 @@
   --butter:      #efe6a8;
   --tangerine:   #fd6734;
   --honey:       #f1c673;
+  --sage:        #a9d3ae;
+  --paper-2:     #f2f2f0;   /* raised form card */
+  --field:       #e8e6e7;   /* input fill */
+  --field-line:  #c5c5c5;   /* input border */
+  --olive:       #2f2d18;   /* "skip" text link */
+  --olive-ink:   #4a4623;   /* secondary text / inactive nav icons */
+  --nav-active:  #d1d0d0;   /* active tab pill */
+  /* public-timeline card colours, used in rotation */
+  --pub-1: #b4ddfb; --pub-2: #c7bdef; --pub-3: #f2f2f0;
+  --pub-4: #fd6734; --pub-5: #f1c673; --pub-6: #a9d3ae;
 
   /* type — Figtree replaces TT Commons Pro */
   --font-serif: "Lora", Georgia, serif;
@@ -42,6 +52,9 @@
   --t-body:     600 16px/18px var(--font-sans);    /* TT Commons DemiBold */
   --text-body:  var(--navy-soft);                  /* body copy colour */
   --t-button:   700 22px/18px var(--font-sans);    /* TT Commons Bold */
+  --t-title-sm: 700 24px/36px var(--font-serif);   /* card title */
+  --t-body-lg:  600 18px/24px var(--font-sans);    /* card description */
+  --t-label:    600 14px/15px var(--font-sans);    /* field label */
 
   /* space */
   --gutter: 24px;
@@ -51,6 +64,8 @@
   --radius-lg: 16px;
   --radius-pill: 999px;
   --elevation-1: 0 2px 8px 0 rgba(36, 31, 26, 0.25);
+  --elevation-0: 0 2px 4px 0 rgba(36, 31, 26, 0.25);
+  --radius-md: 8px;
 
   --button-h: 70px;
   --app-max: 430px;
@@ -96,24 +111,55 @@ svg { display: block; }
   padding-top: var(--safe-top);
 }
 
-/* Bottom tab bar (shown on main app routes, hidden during onboarding) */
+/* Bottom tab bar — floating pill (shown on main app routes, hidden during onboarding) */
 .tabbar {
   flex: none;
   display: flex;
-  justify-content: space-around;
-  padding: var(--s-8) var(--gutter) calc(var(--s-8) + var(--safe-bottom));
+  justify-content: center;
+  padding: var(--s-8) var(--gutter) max(var(--s-16), calc(var(--safe-bottom) + 4px));
   background: var(--paper);
-  border-top: 1px solid var(--track);
 }
 .tabbar[hidden] { display: none; }
-.tabbar a {
-  font: 600 13px/16px var(--font-sans);
-  color: var(--navy);
-  text-decoration: none;
-  opacity: .5;
-  padding: var(--s-8);
+.tabbar-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--paper-2);
+  box-shadow: var(--elevation-1);
 }
-.tabbar a[aria-current="page"] { opacity: 1; }
+/* each item: icon in a small pill (grey when active) with a label underneath */
+.tabbar a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 60px;
+  padding: 2px 0;
+  color: var(--olive-ink);
+  text-decoration: none;
+}
+.tabbar a svg { width: 24px; height: 24px; box-sizing: content-box; padding: 4px 14px; border-radius: var(--radius-pill); transition: background-color .2s ease; }
+.tabbar a span { font: 600 11px/13px var(--font-sans); }
+.tabbar a[aria-current="page"] { color: var(--navy); }
+.tabbar a[aria-current="page"] svg { background: var(--nav-active); }
+.tabbar a[aria-current="page"] span { font-weight: 700; }
+.tabbar a.tab-add {
+  flex: none;
+  min-width: 0;
+  padding: 0;
+  margin: 0 4px;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: var(--white);
+  box-shadow: var(--elevation-1);
+}
+.tabbar a.tab-add svg { padding: 0; }
 
 /* ============================================================
    SHARED COMPONENTS
@@ -242,6 +288,338 @@ svg { display: block; }
 .copy p { font: var(--t-body); color: var(--text-body); }
 
 /* ============================================================
+   CREATE FIRST CHAPTER
+   ============================================================ */
+.ch-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-24);
+  padding-bottom: var(--s-8);
+}
+.ch-scroll > * { flex: none; }   /* never squash rows; the column scrolls instead */
+.footer.ch-footer { padding-top: 40px; }
+.ch-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--s-24) var(--gutter) 0;
+}
+.ch-top .brand { padding: 0; }
+.text-link {
+  font: var(--t-body);
+  line-height: 22px;
+  color: var(--olive);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: var(--s-8) 0 var(--s-8) var(--s-16);   /* comfy tap area */
+}
+.ch-title { font: var(--t-display); padding: 0 var(--gutter); }
+
+/* Suggestion cards: native horizontal scroll with snap, cards peek either side */
+.suggest {
+  display: flex;
+  gap: var(--s-16);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--gutter);
+  padding: 4px var(--gutter) 12px;           /* room for the card shadow */
+  margin: -4px 0 -12px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.suggest::-webkit-scrollbar { display: none; }
+.s-card {
+  flex: 0 0 82.5%;
+  min-height: 240px;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--s-24);
+  padding: var(--s-24);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+  color: var(--navy);
+}
+.s-card-head { display: flex; flex-direction: column; gap: var(--s-4); }
+.s-card-title { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-8); }
+.s-card h3 { margin: 0; font: var(--t-title-sm); }
+.s-card svg { width: 32px; height: 32px; flex: none; }
+.s-card p { font: var(--t-body-lg); max-width: 311px; }
+.btn-select {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-8);
+  min-height: var(--button-h);
+  padding: 12px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--navy);
+  color: var(--white);
+  font: 700 18px/18px var(--font-sans);
+  box-shadow: var(--elevation-1);
+  transition: transform .12s ease;
+}
+.btn-select:active { transform: scale(.97); }
+.btn-select svg { width: 18px; height: 18px; display: none; }
+.s-card.is-selected .btn-select { background: var(--white); color: var(--navy); }
+.s-card.is-selected .btn-select svg { display: block; }
+.s-card-actions { display: flex; align-items: center; gap: var(--s-16); }
+
+.or-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--gutter);
+  font: var(--t-display);
+}
+.or-row svg { width: 44px; height: 53px; flex: none; }
+
+/* Form card */
+.form-card {
+  margin: 0 var(--gutter);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-16);
+  padding: var(--s-16) var(--s-16) 32px;
+  border-radius: var(--radius-lg);
+  background: var(--paper-2);
+  box-shadow: var(--elevation-0);
+  transition: box-shadow .3s ease;
+}
+.form-card.flash { box-shadow: 0 0 0 3px var(--navy), var(--elevation-0); }
+.field { display: flex; flex-direction: column; gap: var(--s-8); min-width: 0; flex: 1; position: relative; }
+.field label, .field .label { font: var(--t-label); color: var(--navy); }
+.input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px;
+  border: 1.5px solid var(--field-line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  color: var(--navy);
+  font: 600 14px/15px var(--font-sans);
+  text-align: left;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.input:focus-visible, .input[aria-expanded="true"] { outline: none; border-color: var(--navy); }
+input.input { min-height: 48px; font: 700 16px/20px var(--font-sans); }
+input.input::placeholder { color: var(--navy); opacity: .45; }
+.input.strong { font-weight: 700; }
+.input .chev { margin-left: auto; width: 16px; height: 16px; flex: none; transition: transform .2s ease; }
+.input[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.field-row { display: flex; gap: var(--s-16); }
+.field-error { font: var(--t-label); color: #b3261e; }
+.field-error[hidden] { display: none; }
+.field.invalid input.input { border-color: #b3261e; }
+
+/* End-date dropdown (overlays the content below, anchored to the field) */
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  margin-top: 6px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: var(--elevation-1);
+  display: flex;
+  flex-direction: column;
+}
+.menu[hidden] { display: none; }
+.menu.up { top: auto; bottom: 100%; margin: 0 0 6px; }   /* open upwards near the bottom edge */
+.menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font: 700 14px/15px var(--font-sans);
+  text-align: left;
+}
+.menu button:active, .menu button:hover { background: var(--paper-2); }
+.menu button svg { width: 16px; height: 16px; visibility: hidden; }
+.menu button[aria-checked="true"] svg { visibility: visible; }
+
+/* Date picker sheet */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(1, 44, 79, 0.35);
+  animation: fade .2s ease;
+}
+.sheet {
+  width: 100%;
+  max-width: var(--app-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-16);
+  padding: var(--s-24) var(--gutter) max(var(--s-24), calc(var(--safe-bottom) + 8px));
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--paper);
+  box-shadow: var(--elevation-1);
+  animation: rise .28s cubic-bezier(.22,.8,.24,1);
+}
+.sheet-head { display: flex; align-items: center; justify-content: space-between; }
+.sheet-head h3 { margin: 0; font: var(--t-title-sm); }
+.cal-nav { display: flex; gap: var(--s-8); }
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--paper-2);
+  box-shadow: var(--elevation-0);
+}
+.icon-btn svg { width: 20px; height: 20px; }
+.icon-btn:disabled { opacity: .35; box-shadow: none; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; text-align: center; }
+.cal .dow { font: var(--t-label); color: var(--navy-soft); padding: 6px 0; }
+.cal button {
+  justify-self: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font: 600 16px/1 var(--font-sans);
+  color: var(--navy);
+}
+.cal button.today { box-shadow: inset 0 0 0 1.5px var(--navy); }
+.cal button[aria-pressed="true"] { background: var(--navy); color: var(--white); box-shadow: var(--elevation-0); }
+.cal button:disabled { color: var(--field-line); }
+.sheet-actions { display: flex; align-items: center; gap: var(--s-16); }
+.sheet-actions .text-link { padding: var(--s-8) var(--s-16) var(--s-8) 0; }
+.sheet-actions .btn-primary { flex: 1; min-height: 56px; font-size: 18px; }
+@keyframes rise { from { transform: translateY(100%); } }
+@keyframes fade { from { opacity: 0; } }
+
+/* Short screens: tighten vertical rhythm on the chapter screen */
+@media (max-height: 760px) {
+  .ch-scroll { gap: var(--s-16); }
+  .ch-top { padding-top: var(--s-16); }
+  .s-card { min-height: 0; }
+}
+
+/* ============================================================
+   TIMELINE HOME (first moment)
+   ============================================================ */
+.home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: var(--s-24) 0;
+}
+.home > * { flex: none; }
+.home-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--gutter);
+}
+.home-top .brand { padding: 0; }
+.round-btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--navy);
+  box-shadow: var(--elevation-1);
+}
+.round-btn svg { width: 24px; height: 24px; }
+.greeting { display: flex; flex-direction: column; gap: var(--s-8); padding: 0 var(--gutter); }
+.greeting h1 { font: var(--t-display); }
+.greeting p { font: 600 18px/22px var(--font-sans); }
+.greeting b { font-weight: 700; }
+
+.prompt-card {
+  margin: 0 var(--gutter);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: var(--s-24);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+  color: var(--navy);
+}
+.prompt-top { display: flex; align-items: flex-end; justify-content: space-between; }
+.prompt-top svg { width: 52px; height: 52px; }
+.date-chip { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.date-chip .d { font: 600 40px/34px var(--font-sans); }
+.date-chip .m { font: 700 18px/15px var(--font-sans); }
+.prompt-body { display: flex; flex-direction: column; gap: var(--s-16); }
+.prompt-body .eyebrow { font: 600 16px/18px var(--font-sans); color: var(--navy-soft); }
+.prompt-body h2 { font: 700 24px/32px var(--font-serif); margin-top: var(--s-8); }
+.prompt-body .btn-select { text-decoration: none; }
+
+.inspo-head { display: flex; flex-direction: column; gap: var(--s-8); padding: 0 var(--gutter); }
+.inspo-head h2 { font: var(--t-display); }
+.inspo-head p { font: 600 18px/22px var(--font-sans); color: var(--navy-soft); }
+.inspo {
+  display: flex;
+  gap: var(--s-8);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--gutter);
+  padding: 2px var(--gutter) 6px;
+  margin: -2px 0 -6px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.inspo::-webkit-scrollbar { display: none; }
+.pub-card {
+  flex: 0 0 222px;
+  min-height: 230px;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--s-16);
+  padding: var(--s-24) var(--s-16);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(36, 31, 26, 0.06);
+  color: var(--navy-soft);
+}
+.pub-card p { font: 600 16px/20px var(--font-sans); }
+.pub-meta { display: flex; align-items: center; gap: 4px; font: 600 12px/12px var(--font-sans); }
+.pub-foot { display: flex; flex-direction: column; gap: 6px; }
+.pub-meta i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.pub-card .pub-chapter { font: 600 12px/14px var(--font-sans); }
+.pub-card .pub-chapter b { font-weight: 700; }
+/* the orange card needs darker text to stay readable */
+.pub-card.on-orange { color: var(--navy); }
+
+/* Settings (facilitator) */
+.settings { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-24); padding: var(--s-24) 0; }
+.settings > * { flex: none; }
+.settings h1 { font: var(--t-display); padding: 0 var(--gutter); }
+.settings .form-card { gap: var(--s-16); }
+.settings .hint { font: 600 14px/18px var(--font-sans); color: var(--navy-soft); }
+.settings .hint code { font: 600 13px/18px ui-monospace, Menlo, monospace; background: var(--field); padding: 1px 4px; border-radius: 4px; word-break: break-all; }
+.settings .btn-primary { min-height: 56px; font-size: 18px; }
+.saved-note { font: 600 14px/18px var(--font-sans); color: #2e7d32; }
+.saved-note[hidden] { display: none; }
+
+/* ============================================================
    PLACEHOLDER (screens not built yet)
    ============================================================ */
 .placeholder {
@@ -263,9 +641,28 @@ svg { display: block; }
 <body>
 <div class="app">
   <main class="screen" id="screen"></main>
-  <nav class="tabbar" id="tabbar" hidden>
-    <a href="#timeline">Timeline</a>
-    <a href="#capture">Capture</a>
+  <nav class="tabbar" id="tabbar" hidden aria-label="Main">
+    <div class="tabbar-pill">
+      <a href="#timeline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20C10 20.5304 10.2107 21.0391 10.5858 21.4142C10.9609 21.7893 11.4696 22 12 22C12.5304 22 13.0391 21.7893 13.4142 21.4142C13.7893 21.0391 14 20.5304 14 20M10 20C10 19.4696 10.2107 18.9609 10.5858 18.5858C10.9609 18.2107 11.4696 18 12 18C12.5304 18 13.0391 18.2107 13.4142 18.5858C13.7893 18.9609 14 19.4696 14 20M10 20H4M14 20H20M12 15L10 13H7C6.73478 13 6.48043 12.8946 6.29289 12.7071C6.10536 12.5196 6 12.2652 6 12V4C6 3.73478 6.10536 3.48043 6.29289 3.29289C6.48043 3.10536 6.73478 3 7 3H17C17.2652 3 17.5196 3.10536 17.7071 3.29289C17.8946 3.48043 18 3.73478 18 4V12C18 12.2652 17.8946 12.5196 17.7071 12.7071C17.5196 12.8946 17.2652 13 17 13H14L12 15Z"/></svg>
+        <span>Timeline</span>
+      </a>
+      <a href="#predictions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12C10.4087 12 8.88258 12.6321 7.75736 13.7574C6.63214 14.8826 6 16.4087 6 18V20C6 20.2652 6.10536 20.5196 6.29289 20.7071C6.48043 20.8946 6.73478 21 7 21H17C17.2652 21 17.5196 20.8946 17.7071 20.7071C17.8946 20.5196 18 20.2652 18 20V18C18 16.4087 17.3679 14.8826 16.2426 13.7574C15.1174 12.6321 13.5913 12 12 12ZM12 12C10.4087 12 8.88258 11.3679 7.75736 10.2426C6.63214 9.11742 6 7.5913 6 6V4C6 3.73478 6.10536 3.48043 6.29289 3.29289C6.48043 3.10536 6.73478 3 7 3H17C17.2652 3 17.5196 3.10536 17.7071 3.29289C17.8946 3.48043 18 3.73478 18 4V6C18 7.5913 17.3679 9.11742 16.2426 10.2426C15.1174 11.3679 13.5913 12 12 12Z"/></svg>
+        <span>Predictions</span>
+      </a>
+      <a href="#capture" class="tab-add" aria-label="Capture a moment">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5V12M12 12V19M12 12H5M12 12H19"/></svg>
+      </a>
+      <a href="#saved">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 7V21L12 17L6 21V7C6 5.93913 6.42143 4.92172 7.17157 4.17157C7.92172 3.42143 8.93913 3 10 3H14C15.0609 3 16.0783 3.42143 16.8284 4.17157C17.5786 4.92172 18 5.93913 18 7Z"/></svg>
+        <span>Saved</span>
+      </a>
+      <a href="#settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317C10.751 2.561 13.249 2.561 13.675 4.317C13.7389 4.5808 13.8642 4.82578 14.0407 5.032C14.2172 5.23822 14.4399 5.39985 14.6907 5.50375C14.9414 5.60764 15.2132 5.65085 15.4838 5.62987C15.7544 5.60889 16.0162 5.5243 16.248 5.383C17.791 4.443 19.558 6.209 18.618 7.753C18.4769 7.98466 18.3924 8.24634 18.3715 8.51677C18.3506 8.78721 18.3938 9.05877 18.4975 9.30938C18.6013 9.55999 18.7627 9.78258 18.9687 9.95905C19.1747 10.1355 19.4194 10.2609 19.683 10.325C21.439 10.751 21.439 13.249 19.683 13.675C19.4192 13.7389 19.1742 13.8642 18.968 14.0407C18.7618 14.2172 18.6001 14.4399 18.4963 14.6907C18.3924 14.9414 18.3491 15.2132 18.3701 15.4838C18.3911 15.7544 18.4757 16.0162 18.617 16.248C19.557 17.791 17.791 19.558 16.247 18.618C16.0153 18.4769 15.7537 18.3924 15.4832 18.3715C15.2128 18.3506 14.9412 18.3938 14.6906 18.4975C14.44 18.6013 14.2174 18.7627 14.0409 18.9687C13.8645 19.1747 13.7391 19.4194 13.675 19.683C13.249 21.439 10.751 21.439 10.325 19.683C10.2611 19.4192 10.1358 19.1742 9.95929 18.968C9.7828 18.7618 9.56011 18.6001 9.30935 18.4963C9.05859 18.3924 8.78683 18.3491 8.51621 18.3701C8.24559 18.3911 7.98375 18.4757 7.752 18.617C6.209 19.557 4.442 17.791 5.382 16.247C5.5231 16.0153 5.60755 15.7537 5.62848 15.4832C5.64942 15.2128 5.60624 14.9412 5.50247 14.6906C5.3987 14.44 5.23726 14.2174 5.03127 14.0409C4.82529 13.8645 4.58056 13.7391 4.317 13.675C2.561 13.249 2.561 10.751 4.317 10.325C4.5808 10.2611 4.82578 10.1358 5.032 9.95929C5.23822 9.7828 5.39985 9.56011 5.50375 9.30935C5.60764 9.05859 5.65085 8.78683 5.62987 8.51621C5.60889 8.24559 5.5243 7.98375 5.383 7.752C4.443 6.209 6.209 4.442 7.753 5.382C8.753 5.99 10.049 5.452 10.325 4.317ZM9 12C9 12.7956 9.31607 13.5587 9.87868 14.1213C10.4413 14.6839 11.2044 15 12 15C12.7956 15 13.5587 14.6839 14.1213 14.1213C14.6839 13.5587 15 12.7956 15 12C15 11.2044 14.6839 10.4413 14.1213 9.87868C13.5587 9.31607 12.7956 9 12 9C11.2044 9 10.4413 9.31607 9.87868 9.87868C9.31607 10.4413 9 11.2044 9 12Z"/></svg>
+        <span>Settings</span>
+      </a>
+    </div>
   </nav>
 </div>
 
@@ -465,7 +862,7 @@ function Onboarding(root) {
   body.addEventListener("pointercancel", () => { tracking = false; dx = 0; render(true); });
 
   segs.forEach(s => s.addEventListener("click", () => go(+s.dataset.go)));
-  root.querySelector("#onb-continue").addEventListener("click", () => { location.hash = "#onboarding-next"; });
+  root.querySelector("#onb-continue").addEventListener("click", () => { location.hash = "#chapter"; });
 
   const onKey = e => {
     if (e.key === "ArrowRight") go(state.onboardingIndex + 1);
@@ -477,13 +874,504 @@ function Onboarding(root) {
   return () => document.removeEventListener("keydown", onKey);
 }
 
+/* ---------- Create your first chapter ---------- */
+const ICON = {
+  family: `<svg viewBox="0 0 32 32" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.6667 7.33333C12.6667 8.21739 13.0179 9.06523 13.643 9.69036C14.2681 10.3155 15.1159 10.6667 16 10.6667C16.8841 10.6667 17.7319 10.3155 18.357 9.69036C18.9821 9.06523 19.3333 8.21739 19.3333 7.33333C19.3333 6.44928 18.9821 5.60143 18.357 4.97631C17.7319 4.35119 16.8841 4 16 4C15.1159 4 14.2681 4.35119 13.643 4.97631C13.0179 5.60143 12.6667 6.44928 12.6667 7.33333ZM15.9999 28.4906L22.7933 21.6959C23.1797 21.3145 23.4868 20.8604 23.697 20.3599C23.9072 19.8593 24.0163 19.322 24.0181 18.7791C24.0199 18.2362 23.9142 17.6982 23.7073 17.1963C23.5003 16.6943 23.1961 16.2383 22.8122 15.8544C22.4283 15.4705 21.9722 15.1663 21.4703 14.9593C20.9683 14.7523 20.4304 14.6467 19.8875 14.6485C19.3445 14.6502 18.8073 14.7593 18.3067 14.9695C17.8061 15.1798 17.352 15.4869 16.9706 15.8733L15.9999 16.8426L15.0293 15.8733C14.6479 15.4869 14.1938 15.1798 13.6932 14.9695C13.1926 14.7593 12.6554 14.6502 12.1124 14.6485C11.5695 14.6467 11.0316 14.7523 10.5296 14.9593C10.0277 15.1663 9.57163 15.4705 9.18771 15.8544C8.80379 16.2383 8.4996 16.6943 8.29264 17.1963C8.08568 17.6982 7.98004 18.2362 7.98179 18.7791C7.98355 19.322 8.09267 19.8593 8.30288 20.3599C8.51308 20.8604 8.82022 21.3145 9.20662 21.6959L15.9999 28.4906Z"/></svg>`,
+  winter: `<svg viewBox="0 0 32 32" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.3333 5.33333L16 6.66667M16 6.66667L18.6667 5.33333M16 6.66667V2.66667M16 6.66667V11.3333L20 13.6267M23.9043 8.35742L24.0829 11.333M24.0829 11.333L24.083 11.3334L26.571 12.9761M24.0829 11.333L27.5463 9.33333M24.0829 11.333L20.041 13.6667L20.0543 18.2773M26.571 19.0241L24.083 20.6668L24.083 20.6668M24.083 20.6668L23.9043 23.6428M24.083 20.6668L27.5467 22.6667M24.083 20.6668L20.0414 18.3333L16.0547 20.6507M18.6667 26.6667L16 25.3333M16 25.3333L13.3333 26.6667M16 25.3333V29.333M16 25.3333V20.6664L12 18.373M8.0957 23.6428L7.91704 20.6668L7.917 20.6667M7.917 20.6667L5.42904 19.0241M7.917 20.6667L4.45312 22.6667M7.917 20.6667L11.9585 18.3333L11.9451 13.7227M5.42904 12.9761L7.91704 11.3334L7.91704 11.3333M7.91704 11.3333L8.0957 8.35742M7.91704 11.3333L4.45312 9.33333M7.91704 11.3333L11.9585 13.6667L15.9451 11.3493"/></svg>`,
+  job: `<svg viewBox="0 0 32 32" fill="none" stroke="var(--navy)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.6667 9.33333V6.66667C10.6667 5.95942 10.9476 5.28115 11.4477 4.78105C11.9478 4.28095 12.6261 4 13.3333 4H18.6667C19.3739 4 20.0522 4.28095 20.5523 4.78105C21.0524 5.28115 21.3333 5.95942 21.3333 6.66667V9.33333M4 12C4 11.2928 4.28095 10.6145 4.78105 10.1144C5.28115 9.61428 5.95942 9.33333 6.66667 9.33333H25.3333C26.0406 9.33333 26.7189 9.61428 27.219 10.1144C27.719 10.6145 28 11.2928 28 12V24C28 24.7072 27.719 25.3855 27.219 25.8856C26.7189 26.3857 26.0406 26.6667 25.3333 26.6667H6.66667C5.95942 26.6667 5.28115 26.3857 4.78105 25.8856C4.28095 25.3855 4 24.7072 4 24V12Z"/></svg>`,
+  telescope: `<svg viewBox="0 0 32 32" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 28L16 21.3333L24 28M16 17.3333V28M18.6667 6.66667L22.6667 14M4.39196 18.2373L4.61329 18.612C5.30662 19.7853 6.77862 20.2987 8.08662 19.8253L27.076 12.9387C27.2633 12.874 27.4344 12.7693 27.5772 12.6319C27.72 12.4944 27.8311 12.3275 27.9028 12.1427C27.9745 11.9579 28.005 11.7597 27.9924 11.5619C27.9797 11.3641 27.924 11.1714 27.8293 10.9973L24.336 4.724C24.149 4.39947 23.8437 4.15989 23.4841 4.0555C23.1244 3.9511 22.7383 3.98998 22.4066 4.164L22.332 4.20667L5.40662 14.364C4.04662 15.1813 3.59729 16.8933 4.39329 18.2373H4.39196Z"/></svg>`,
+  car: `<svg viewBox="0 0 32 32" fill="none" stroke="var(--navy)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.66667 22.6667C6.66667 23.3739 6.94762 24.0522 7.44772 24.5523C7.94781 25.0524 8.62609 25.3333 9.33333 25.3333C10.0406 25.3333 10.7189 25.0524 11.219 24.5523C11.719 24.0522 12 23.3739 12 22.6667M6.66667 22.6667C6.66667 21.9594 6.94762 21.2811 7.44772 20.781C7.94781 20.281 8.62609 20 9.33333 20C10.0406 20 10.7189 20.281 11.219 20.781C11.719 21.2811 12 21.9594 12 22.6667M16 8H6.66667L4 14.6667V22.6667H6.66667M12 22.6667H20M20 22.6667C20 23.3739 20.281 24.0522 20.781 24.5523C21.2811 25.0524 21.9594 25.3333 22.6667 25.3333C23.3739 25.3333 24.0522 25.0524 24.5523 24.5523C25.0524 24.0522 25.3333 23.3739 25.3333 22.6667M20 22.6667C20 21.9594 20.281 21.2811 20.781 20.781C21.2811 20.281 21.9594 20 22.6667 20C23.3739 20 24.0522 20.281 24.5523 20.781C25.0524 21.2811 25.3333 21.9594 25.3333 22.6667M25.3333 22.6667H28V17.3333C28 16.6261 27.719 15.9478 27.219 15.4477C26.7189 14.9476 26.0406 14.6667 25.3333 14.6667H24M4 14.6667H16M16 8H18.6667L24 14.6667M16 8V14.6667M24 14.6667H16"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>`,
+  chevDown: `<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`,
+  chevLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>`,
+  chevRight: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`,
+  scribbleArrow: `<svg viewBox="0 0 44 53" aria-hidden="true"><path fill="var(--navy)" d="M27.9472 49.0584C28.2494 49.0194 28.3627 49.0584 28.476 49.0194C35.3872 44.722 40.0703 38.6276 41.8453 30.4236C42.2985 28.3531 42.223 26.2044 41.6943 24.0948C40.599 19.5631 36.9357 16.4378 32.4415 16.1643C30.0999 16.008 27.8339 16.2815 25.7945 17.6098C25.6435 18.7427 25.5302 19.8756 25.3036 20.9304C24.9259 22.6494 24.0573 24.0558 22.5089 24.9152C21.3759 25.5794 20.2429 25.5794 19.6386 24.9543C18.8455 24.1339 18.8455 23.04 19.3365 22.1415C20.0163 20.8914 20.8471 19.7194 21.7158 18.6255C22.2823 17.9223 23.0376 17.3363 23.7174 16.7503C23.0753 12.3358 19.0343 10.4606 14.2002 12.2967C14.0492 12.9218 13.8981 13.5859 13.7092 14.211C12.9539 16.5159 11.5566 18.2739 9.29057 19.0943C8.42194 19.4068 7.47777 19.524 6.72244 18.7036C6.15594 18.0786 6.15594 16.9847 6.76021 15.8908C7.74214 14.1719 9.21504 12.9608 10.8012 11.906C11.3677 11.5544 11.9342 11.2028 12.5007 10.8903C11.7454 4.05364 5.81605 -0.790626 0 1.94404C0.0377665 1.43617 -2.30734e-06 1.00644 0.151064 0.77204C0.339897 0.498574 0.755328 0.342307 1.09523 0.264174C4.30538 -0.360892 7.28894 0.0297736 9.74376 2.45191C11.5943 4.24897 12.8406 6.43671 13.6715 8.93697C13.7848 9.28857 13.8981 9.64017 14.0492 9.99177C14.0492 10.0308 14.1247 10.0699 14.2757 10.1871C14.6156 10.148 15.0311 10.148 15.4465 10.0699C20.5072 9.24951 23.1509 10.6559 25.4924 15.5392C25.9456 15.383 26.4743 15.2267 26.9653 15.0314C29.8733 14.0156 32.7814 13.9375 35.7271 14.9532C40.5235 16.594 43.6203 20.8523 43.9602 26.2435C44.1491 29.1735 43.6581 31.9863 42.6384 34.721C40.1458 41.3232 36.067 46.5191 29.9489 49.9179C29.6467 50.1132 29.3068 50.2695 29.0047 50.4648C28.9669 50.5039 28.9292 50.582 28.8159 50.8164C30.0999 51.129 31.3085 51.0118 32.517 50.9336C33.6878 50.8946 34.8963 50.7774 36.1803 50.6992C36.067 51.715 35.5383 52.1056 34.8963 52.34C34.1409 52.5744 33.3856 52.887 32.6303 52.926C30.5909 53.0042 28.5137 53.0432 26.4366 52.926C24.8126 52.8088 24.3594 51.9103 25.077 50.543C26.6254 47.652 28.2116 44.7611 29.7978 41.8702C30.0622 41.4014 30.4021 41.0107 30.8175 40.4638C31.5351 41.3232 31.2329 41.9483 30.9686 42.5343C29.9111 44.6439 28.9669 46.7535 27.9472 49.0584ZM7.85543 17.5316C10.4613 17.18 12.0853 15.4611 12.1986 13.039C10.4613 14.211 8.7996 15.2658 7.85543 17.5316ZM20.6205 23.587C22.8488 23.04 23.9062 21.4774 23.6796 19.0943C22.2445 20.3444 20.9982 21.5164 20.6205 23.587Z"/></svg>`,
+};
+
+const SUGGESTIONS = [
+  { name: "Family",       icon: "family",    bg: "--lilac",  body: "Little everyday moments with the people who matter most." },
+  { name: "Winter",       icon: "winter",    bg: "--sky",    body: "Cosy nights, cold walks and everything in between." },
+  { name: "The New Job",  icon: "job",       bg: "--honey",  body: "First days, new faces and the small wins along the way." },
+  { name: "Observations", icon: "telescope", bg: "--butter", body: "The little things you notice and don’t want to forget." },
+  { name: "A trip",       icon: "car",       bg: "--sage",   body: "The places, the food and the moments that made it." },
+];
+const SUGGEST_START = 2;   // Figma opens centred on "The New Job"
+
+/* dates */
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const sameDay = (a, b) => a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+function ordinal(n) {
+  const s = n % 100;
+  if (s >= 11 && s <= 13) return n + "th";
+  return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 10] || "th");
+}
+const fmtDate = d => `${ordinal(d.getDate())} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
+
+/* draft chapter lives in memory so leaving and coming back keeps it */
+state.chapterDraft = { name: "", suggestion: null, start: startOfDay(new Date()), end: null };
+state.chapter = null;
+
+function ChapterSetup(root) {
+  const draft = state.chapterDraft;
+  root.innerHTML = `
+    <div class="ch-scroll" id="ch-scroll">
+      <div class="ch-top">
+        <div class="brand">${logo}<span>TYWW</span></div>
+        <a class="text-link" href="#timeline">skip</a>
+      </div>
+      <h1 class="ch-title">Let’s start your<br>first chapter</h1>
+
+      <div class="suggest" id="suggest" aria-label="Suggested chapters">
+        ${SUGGESTIONS.map((s, i) => `
+          <article class="s-card" style="background: var(${s.bg})" data-i="${i}">
+            <div class="s-card-head">
+              <div class="s-card-title"><h3>${s.name}</h3>${ICON[s.icon]}</div>
+              <p>${s.body}</p>
+            </div>
+            <div class="s-card-actions">
+              <button class="btn-select" data-select="${i}" aria-label="${s.name}">${ICON.check}<span>Select</span></button>
+            </div>
+          </article>`).join("")}
+      </div>
+
+      <div class="or-row"><span>Or</span>${ICON.scribbleArrow}</div>
+
+      <form class="form-card" id="ch-form" novalidate>
+        <div class="field" id="name-field">
+          <label for="ch-name">Write your own</label>
+          <input class="input" id="ch-name" type="text" placeholder="Chapter Name" autocomplete="off" autocapitalize="words" maxlength="40" enterkeyhint="done">
+          <p class="field-error" id="name-error" hidden>Give your chapter a name, or pick one above.</p>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <span class="label" id="start-label">Start date</span>
+            <button type="button" class="input" id="ch-start" aria-labelledby="start-label ch-start"></button>
+          </div>
+          <div class="field">
+            <span class="label" id="end-label">End date</span>
+            <button type="button" class="input strong" id="ch-end" aria-haspopup="menu" aria-expanded="false" aria-labelledby="end-label ch-end"></button>
+            <div class="menu" id="end-menu" role="menu" hidden>
+              <button type="button" role="menuitemradio" data-end="open">Leave open ${ICON.check}</button>
+              <button type="button" role="menuitemradio" data-end="pick">Select end date ${ICON.check}</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="footer ch-footer">
+      <button class="btn-primary" type="submit" form="ch-form">Create chapter</button>
+    </div>`;
+
+  const scroller = root.querySelector("#ch-scroll");
+  const suggest  = root.querySelector("#suggest");
+  const form     = root.querySelector("#ch-form");
+  const nameIn   = root.querySelector("#ch-name");
+  const nameErr  = root.querySelector("#name-error");
+  const startBtn = root.querySelector("#ch-start");
+  const endBtn   = root.querySelector("#ch-end");
+  const endMenu  = root.querySelector("#end-menu");
+  const cards    = [...root.querySelectorAll(".s-card")];
+
+  function render() {
+    nameIn.value = draft.name;
+    cards.forEach((c, i) => {
+      const on = draft.suggestion === i;
+      c.classList.toggle("is-selected", on);
+      c.querySelector(".btn-select span").textContent = on ? "Selected" : "Select";
+      c.querySelector(".btn-select").setAttribute("aria-pressed", on);
+    });
+    startBtn.textContent = fmtDate(draft.start);
+    endBtn.innerHTML = `<span>${draft.end ? fmtDate(draft.end) : "Leave Open"}</span>${ICON.chevDown}`;
+    endMenu.querySelector('[data-end="open"]').setAttribute("aria-checked", !draft.end);
+    endMenu.querySelector('[data-end="pick"]').setAttribute("aria-checked", !!draft.end);
+  }
+
+  /* centre the starting card (or the selected one) */
+  requestAnimationFrame(() => {
+    const c = cards[draft.suggestion ?? SUGGEST_START];
+    suggest.scrollLeft = c.offsetLeft - (suggest.clientWidth - c.offsetWidth) / 2;
+  });
+
+  /* Select → pre-fill the name and bring the form card into view */
+  suggest.addEventListener("click", e => {
+      const b = e.target.closest("[data-select]");
+    if (!b) return;
+    const i = +b.dataset.select;
+    /* tapping "Selected" again deselects and clears the name it pre-filled */
+    if (draft.suggestion === i) {
+      if (draft.name.trim() === SUGGESTIONS[i].name) draft.name = "";
+      draft.suggestion = null;
+      render();
+      return;
+    }
+    draft.suggestion = i;
+    draft.name = SUGGESTIONS[i].name;
+    setNameError(false);
+    render();
+    const card = form;
+    scroller.scrollTo({ top: card.offsetTop - scroller.clientHeight / 2 + card.offsetHeight / 2, behavior: "smooth" });
+    card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+    setTimeout(() => card.classList.remove("flash"), 900);
+  });
+
+  /* typing your own name un-selects a suggestion that no longer matches */
+  nameIn.addEventListener("input", () => {
+    draft.name = nameIn.value;
+    if (draft.suggestion !== null && nameIn.value.trim() !== SUGGESTIONS[draft.suggestion].name) {
+      draft.suggestion = null;
+      cards.forEach(c => c.classList.remove("is-selected"));
+    }
+    if (nameIn.value.trim()) setNameError(false);
+  });
+
+  function setNameError(on) {
+    nameErr.hidden = !on;
+    root.querySelector("#name-field").classList.toggle("invalid", on);
+  }
+
+  /* start date → date picker */
+  startBtn.addEventListener("click", () => openDatePicker({
+    title: "Start date",
+    value: draft.start,
+    onDone: d => {
+      draft.start = d;
+      if (draft.end && draft.end < d) draft.end = null;   // keep end after start
+      render();
+    },
+  }));
+
+  /* end date → dropdown (Leave open / Select end date) */
+  function setMenu(open) {
+    if (open) {
+      const room = scroller.getBoundingClientRect().bottom - endBtn.getBoundingClientRect().bottom;
+      endMenu.classList.toggle("up", room < 120);
+    }
+    endMenu.hidden = !open;
+    endBtn.setAttribute("aria-expanded", open);
+  }
+  endBtn.addEventListener("click", e => { e.stopPropagation(); setMenu(endMenu.hidden); });
+  endMenu.addEventListener("click", e => {
+    const b = e.target.closest("[data-end]");
+    if (!b) return;
+    setMenu(false);
+    if (b.dataset.end === "open") { draft.end = null; render(); return; }
+    openDatePicker({
+      title: "End date",
+      value: draft.end,
+      min: draft.start,
+      onDone: d => { draft.end = d; render(); },
+    });
+  });
+  const closeMenu = e => { if (!e.target.closest("#end-menu")) setMenu(false); };
+  document.addEventListener("click", closeMenu);
+
+  /* create */
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const name = nameIn.value.trim();
+    if (!name) {
+      setNameError(true);
+      scroller.scrollTo({ top: form.offsetTop - 24, behavior: "smooth" });
+      nameIn.focus({ preventScroll: true });
+      return;
+    }
+    state.chapter = { name, start: draft.start, end: draft.end, suggestion: draft.suggestion };
+    nameIn.blur();
+    location.hash = "#timeline";
+  });
+
+  render();
+  return () => { document.removeEventListener("click", closeMenu); closeSheet(); };
+}
+
+/* ---------- Date picker (bottom sheet) ---------- */
+let closeSheet = () => {};
+function openDatePicker({ title, value, min, onDone }) {
+  closeSheet();
+  const today = startOfDay(new Date());
+  let selected = value ? startOfDay(value) : null;
+  const base = selected || (min && min > today ? min : today);
+  let view = new Date(base.getFullYear(), base.getMonth(), 1);
+
+  const wrap = document.createElement("div");
+  wrap.className = "sheet-backdrop";
+  wrap.innerHTML = `
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="${title}">
+      <div class="sheet-head">
+        <h3 id="cal-month"></h3>
+        <div class="cal-nav">
+          <button type="button" class="icon-btn" data-nav="-1" aria-label="Previous month">${ICON.chevLeft}</button>
+          <button type="button" class="icon-btn" data-nav="1" aria-label="Next month">${ICON.chevRight}</button>
+        </div>
+      </div>
+      <div class="cal" id="cal"></div>
+      <div class="sheet-actions">
+        <button type="button" class="text-link" data-cancel>Cancel</button>
+        <button type="button" class="btn-primary" data-done>Set ${title.toLowerCase()}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+
+  const cal = wrap.querySelector("#cal");
+  const doneBtn = wrap.querySelector("[data-done]");
+  const prevBtn = wrap.querySelector('[data-nav="-1"]');
+
+  function draw() {
+    wrap.querySelector("#cal-month").textContent = `${MONTHS[view.getMonth()]} ${view.getFullYear()}`;
+    const lead = (view.getDay() + 6) % 7;                      // weeks start Monday
+    const days = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+    let html = ["M","T","W","T","F","S","S"].map(d => `<span class="dow" aria-hidden="true">${d}</span>`).join("");
+    html += "<span></span>".repeat(lead);
+    for (let d = 1; d <= days; d++) {
+      const date = new Date(view.getFullYear(), view.getMonth(), d);
+      const off = min && date < min;
+      html += `<button type="button" data-d="${d}" class="${sameDay(date, today) ? "today" : ""}"
+        aria-pressed="${sameDay(date, selected)}" aria-label="${fmtDate(date)}" ${off ? "disabled" : ""}>${d}</button>`;
+    }
+    cal.innerHTML = html;
+    doneBtn.disabled = !selected;
+    doneBtn.style.opacity = selected ? "" : ".4";
+    prevBtn.disabled = !!min && view <= new Date(min.getFullYear(), min.getMonth(), 1);
+  }
+
+  wrap.addEventListener("click", e => {
+    if (e.target === wrap || e.target.closest("[data-cancel]")) return closeSheet();
+    const nav = e.target.closest("[data-nav]");
+    if (nav && !nav.disabled) { view = new Date(view.getFullYear(), view.getMonth() + +nav.dataset.nav, 1); return draw(); }
+    const day = e.target.closest("[data-d]");
+    if (day && !day.disabled) { selected = new Date(view.getFullYear(), view.getMonth(), +day.dataset.d); return draw(); }
+    if (e.target.closest("[data-done]") && selected) { onDone(selected); closeSheet(); }
+  });
+  const onKey = e => { if (e.key === "Escape") closeSheet(); };
+  document.addEventListener("keydown", onKey);
+
+  closeSheet = () => {
+    wrap.remove();
+    document.removeEventListener("keydown", onKey);
+    closeSheet = () => {};
+  };
+  draw();
+}
+
+/* ---------- Tester name (set per session) ----------
+   Set it with ?name=Anna in the link, or on the Settings tab. */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+state.userName = (new URLSearchParams(location.search).get("name") || "").trim();
+
+/* ---------- Chapter themes: tailored prompt + public-timeline examples ---------- */
+const THEMES = [
+  {
+    id: "winter", match: /winter|christmas|xmas|snow|frost/i,
+    prompt: () => "What’s the first thing you want to remember about this winter?",
+    posts: [
+      ["Frost on the windscreen this morning. Scraped it off with my library card.", "Aoife", "Galway", "Dark Evenings"],
+      ["First fire of the year lit. The dog hasn’t moved from in front of it since.", "Johnathan", "Wexford", "Our First Winter Here"],
+      ["Dark by half four. Walked home under the Christmas lights going up.", "Jane", "Cork", "Advent in Cork"],
+    ],
+  },
+  {
+    id: "season", match: /summer|spring|autumn|fall/i,
+    prompt: name => `What’s the first thing you want to remember about this ${(name.match(/summer|spring|autumn|fall/i) || ["season"])[0].toLowerCase()}?`,
+    posts: [
+      ["Ate dinner outside for the first time this year. Midges and all.", "Ciara", "Mayo", "The Long Summer"],
+      ["The light was still going at ten o’clock. Stayed out to watch it.", "Jane", "Cork", "Summer of Saying Yes"],
+      ["Swam at Salthill before work. Freezing. Would do it again.", "Johnathan", "Wexford", "Sea Swims"],
+    ],
+  },
+  {
+    id: "family", match: /family|mum|mom|dad|kid|child|son|daughter|gran|nana|sister|brother/i,
+    prompt: () => "What’s a little moment with your family you want to hold on to?",
+    posts: [
+      ["Gran taught the kids to play 25 at the kitchen table. Lost every hand.", "Ciara", "Mayo", "Summers at Gran’s"],
+      ["Dad rang just to tell me the swallows are back in the shed.", "Tom", "Kilkenny", "Dad’s Garden"],
+      ["Sunday dinner, nine of us around a table built for six.", "Jane", "Cork", "Sunday Roasts"],
+    ],
+  },
+  {
+    id: "baby", match: /baby|newborn|pregnan|bump/i,
+    prompt: () => "What’s one thing about these early days you never want to forget?",
+    posts: [
+      ["She grabbed my finger and wouldn’t let go. Cold tea, worth it.", "Niamh", "Dublin", "Baby Róisín"],
+      ["Three hours of sleep and somehow the happiest I’ve been.", "Johnathan", "Wexford", "Newborn Fog"],
+      ["First proper walk with the buggy. Everyone in the shop stopped to look.", "Jane", "Cork", "Maternity Leave"],
+    ],
+  },
+  {
+    id: "work", match: /job|work|career|role|office|intern|promotion/i,
+    prompt: () => "What do you want to remember about these first days at work?",
+    posts: [
+      ["Day three and I finally know where the good kettle is.", "Niamh", "Dublin", "The New Job"],
+      ["Someone said my name in a meeting without checking their notes.", "Johnathan", "Wexford", "Starting at the Council"],
+      ["Packed a lunch on the first day like I was starting school again.", "Jane", "Cork", "Back to Work"],
+    ],
+  },
+  {
+    id: "school", match: /school|college|uni|course|class|exam|study/i,
+    prompt: () => "What’s one thing from this first stretch you want to keep?",
+    posts: [
+      ["New uniform, new bag, same nerves. He didn’t look back at the gate.", "Aoife", "Galway", "Big School"],
+      ["Found a quiet corner of the library that’s now mine.", "Eoin", "Sligo", "Final Year"],
+      ["Got lost twice looking for the lecture hall. Made a friend the second time.", "Jane", "Cork", "First Term at UCC"],
+    ],
+  },
+  {
+    id: "move", match: /move|moving|house|home|flat|apartment|new place/i,
+    prompt: () => "What’s the first thing you want to remember about the new place?",
+    posts: [
+      ["Ate chips on the floor surrounded by boxes. Best dinner in ages.", "Sinéad", "Dublin", "Moving to Dublin"],
+      ["Worked out which floorboard creaks. Already fond of it.", "Johnathan", "Wexford", "The New House"],
+      ["The neighbour left a note and a loaf of brown bread on the step.", "Jane", "Cork", "Settling In"],
+    ],
+  },
+  {
+    id: "trip", match: /trip|travel|holiday|vacation|abroad|road|journey|camping|weekend away/i,
+    prompt: () => "What’s the first thing you want to remember about this trip?",
+    posts: [
+      ["Got lost looking for the hostel and found the best chips of my life.", "Eoin", "Sligo", "Interrailing"],
+      ["Woke up to the sound of the sea and forgot where I was for a second.", "Jane", "Cork", "West Cork Week"],
+      ["Four hours looking out the train window. Didn’t open my book once.", "Johnathan", "Wexford", "The Long Way Home"],
+    ],
+  },
+  {
+    id: "observe", match: /observ|notice|little things|everyday|day to day/i,
+    prompt: () => "What did you notice today that you don’t want to forget?",
+    posts: [
+      ["The man at the bus stop feeds the same pigeon every morning. It waits for him.", "Jane", "Cork", "Observations"],
+      ["Rainbow over the motorway. Everyone slowed down to look.", "Johnathan", "Wexford", "Commute Notes"],
+      ["A kid on the Luas explained clouds to his dad. Mostly right.", "Sinéad", "Dublin", "Overheard"],
+    ],
+  },
+];
+const DEFAULT_THEME = {
+  id: "default",
+  prompt: name => name ? `What’s the first thing you want to remember about ${esc(name)}?` : "What’s the first thing you want to remember about today?",
+  posts: [
+    ["The rain stopped just long enough for a walk on the pier.", "Jane", "Cork", "Walking More"],
+    ["Made soup from whatever was left in the fridge. Somehow brilliant.", "Johnathan", "Wexford", "Cooking for One"],
+    ["Bumped into an old teacher in the shop. She remembered my essay.", "Aoife", "Galway", "Home for a While"],
+  ],
+};
+const themeFor = name => THEMES.find(t => t.match.test(name || "")) || DEFAULT_THEME;
+const PUB_COLOURS = ["--pub-1", "--pub-2", "--pub-3", "--pub-4", "--pub-5", "--pub-6"];
+
+function Timeline(root) {
+  const c = state.chapter;
+  const today = startOfDay(new Date());
+  const theme = themeFor(c && c.name);
+  const themeIndex = Math.max(0, THEMES.indexOf(theme));
+  const cardBg = c && c.suggestion !== null ? SUGGESTIONS[c.suggestion].bg : "--sky";
+  /* rotate the public-card colours, skipping the one the prompt card already uses */
+  const SAME = { "--sky": "--pub-1", "--lilac": "--pub-2", "--honey": "--pub-5", "--sage": "--pub-6" };
+  const pubColours = PUB_COLOURS.filter(p => p !== SAME[cardBg]);
+
+  let dayLine = "Day 1 of <b>your timeline</b>";
+  if (c) {
+    const day = Math.round((today - startOfDay(c.start)) / 864e5) + 1;
+    dayLine = day >= 1
+      ? `Day ${day} of <b>${esc(c.name)}</b>`
+      : `<b>${esc(c.name)}</b> starts ${fmtDate(c.start)}`;
+  }
+
+  root.innerHTML = `
+    <div class="home">
+      <div class="home-top">
+        <div class="brand">${logo}<span>TYWW</span></div>
+        <a class="round-btn" href="#menu" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6H20M7 12H20M10 18H20"/></svg>
+        </a>
+      </div>
+
+      <div class="greeting">
+        <h1>Hi ${esc(state.userName || "there")}</h1>
+        <p>${dayLine}</p>
+      </div>
+
+      <section class="prompt-card" style="background: var(${cardBg})">
+        <div class="prompt-top">
+          <svg viewBox="0 0 52 52" fill="none" stroke="var(--navy)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 41.1667C9.36485 39.4476 11.6616 37.7285 13.3901 36.0094M13.3901 36.0094C16.0188 33.3952 17.3333 30.7809 17.3333 28.1667C17.3333 21.6667 15.1667 21.6667 13 21.6667C10.8333 21.6667 8.59733 24.0175 8.66667 28.1667C8.73181 32.0907 11.491 33.9493 13.3901 36.0094ZM13.3901 36.0094C13.6386 36.2789 13.8723 36.5519 14.0833 36.8333C17.3333 41.1667 19.5 42.25 21.6667 39C23.1118 36.8333 24.1952 35.0285 24.9167 33.5833C27.0833 38.6382 29.9715 41.1667 33.5833 41.1667H39M39 41.1667L34.6667 36.8333V10.8333C34.6667 8.4045 36.5712 6.5 39 6.5C41.4288 6.5 43.3333 8.4045 43.3333 10.8333V36.8333L39 41.1667ZM34.6667 15.1667H43.3333"/></svg>
+          <div class="date-chip" aria-label="${fmtDate(today)}">
+            <span class="d">${today.getDate()}</span>
+            <span class="m">${MONTHS[today.getMonth()].slice(0, 3)}</span>
+          </div>
+        </div>
+        <div class="prompt-body">
+          <div>
+            <p class="eyebrow">Add your first moment</p>
+            <h2>${theme.prompt(c ? c.name : "")}</h2>
+          </div>
+          <a class="btn-select" href="#capture">Capture first moment</a>
+        </div>
+      </section>
+
+      <div class="inspo-head">
+        <h2>Need some inspiration?</h2>
+        <p>What other people have captured today</p>
+      </div>
+      <div class="inspo" aria-label="From the public timeline">
+        ${theme.posts.map(([text, who, where, chapter], i) => {
+          const colour = pubColours[(themeIndex * 3 + i) % pubColours.length];
+          return `
+          <article class="pub-card ${colour === "--pub-4" ? "on-orange" : ""}" style="background: var(${colour})">
+            <p>${esc(text)}</p>
+            <div class="pub-foot">
+              <div class="pub-meta"><span>${esc(who)}</span><i aria-hidden="true"></i><span>${esc(where)}</span></div>
+              <p class="pub-chapter">in <b>${esc(chapter)}</b></p>
+            </div>
+          </article>`;
+        }).join("")}
+      </div>
+    </div>`;
+}
+
+/* ---------- Settings: facilitator sets the tester's name ---------- */
+function Settings(root) {
+  root.innerHTML = `
+    <div class="settings">
+      <div class="home-top"><div class="brand">${logo}<span>TYWW</span></div></div>
+      <h1>Settings</h1>
+      <form class="form-card" id="name-form">
+        <div class="field">
+          <label for="tester-name">Tester’s first name</label>
+          <input class="input" id="tester-name" type="text" autocomplete="off" autocapitalize="words" placeholder="e.g. Anna" value="${esc(state.userName)}">
+        </div>
+        <button class="btn-primary" type="submit">Save name</button>
+        <p class="saved-note" id="saved-note" hidden>Saved — the home screen now says “Hi <span></span>”.</p>
+        <p class="hint">Tip: you can also set it in the link before a session, e.g. <code>…/index.html?name=Anna</code></p>
+      </form>
+      <div class="form-card">
+        <p class="hint">Starting a new test session? This clears the chapter and goes back to the first onboarding screen (the name is kept).</p>
+        <button class="btn-primary" id="restart" type="button">Restart prototype</button>
+      </div>
+    </div>`;
+
+  root.querySelector("#name-form").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = root.querySelector("#tester-name").value.trim();
+    state.userName = v;
+    const url = new URL(location.href);
+    v ? url.searchParams.set("name", v) : url.searchParams.delete("name");
+    history.replaceState(null, "", url);                       // keeps the name if the page is reloaded
+    const note = root.querySelector("#saved-note");
+    note.querySelector("span").textContent = v || "there";
+    note.hidden = false;
+    root.querySelector("#tester-name").blur();
+  });
+  root.querySelector("#restart").addEventListener("click", () => {
+    state.onboardingIndex = 0;
+    state.chapter = null;
+    state.chapterDraft = { name: "", suggestion: null, start: startOfDay(new Date()), end: null };
+    location.hash = "#onboarding";
+  });
+}
+
 const Placeholder = (title, note) => root => {
   root.innerHTML = `
     <div class="brand">${logo}<span>TYWW</span></div>
     <div class="placeholder">
       <h2>${title}</h2>
       <p>${note}</p>
-      <p><a href="#onboarding">← Back to onboarding</a></p>
+      <p><a href="#timeline">← Back to home</a></p>
     </div>`;
 };
 
@@ -492,9 +1380,13 @@ const Placeholder = (title, note) => root => {
    ============================================================ */
 const ROUTES = {
   "onboarding":      { view: Onboarding },
-  "onboarding-next": { view: Placeholder("Next onboarding step", "Coming next — share the Figma frame and we’ll build it.") },
-  "timeline":        { view: Placeholder("Timeline", "Not built yet."), tabs: true },
-  "capture":         { view: Placeholder("Capture", "Not built yet."), tabs: true },
+  "chapter":         { view: ChapterSetup },
+  "timeline":        { view: Timeline, tabs: true },
+  "capture":         { view: Placeholder("Capture a moment", "Not built yet — share the Figma frame for “Capture first moment”."), tabs: true },
+  "predictions":     { view: Placeholder("Predictions", "Not built yet."), tabs: true },
+  "saved":           { view: Placeholder("Saved", "Moments you bookmark from the public timeline will live here. Not built yet."), tabs: true },
+  "menu":            { view: Placeholder("Menu", "Not built yet."), tabs: true },
+  "settings":        { view: Settings, tabs: true },
 };
 const DEFAULT_ROUTE = "onboarding";
 
