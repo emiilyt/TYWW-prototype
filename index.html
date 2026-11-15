@@ -1509,7 +1509,7 @@ function ChapterSetup(root) {
             <span class="label" id="end-label">End date</span>
             <button type="button" class="input strong" id="ch-end" aria-haspopup="menu" aria-expanded="false" aria-labelledby="end-label ch-end"></button>
             <div class="menu" id="end-menu" role="menu" hidden>
-              <button type="button" role="menuitemradio" data-end="open">Leave open ${ICON.check}</button>
+              <button type="button" role="menuitemradio" data-end="open">Leave open for now ${ICON.check}</button>
               <button type="button" role="menuitemradio" data-end="pick">Select end date ${ICON.check}</button>
             </div>
           </div>
@@ -1539,7 +1539,7 @@ function ChapterSetup(root) {
       c.querySelector(".btn-select").setAttribute("aria-pressed", on);
     });
     startBtn.textContent = fmtDate(draft.start);
-    endBtn.innerHTML = `<span>${draft.end ? fmtDate(draft.end) : "Leave Open"}</span>${ICON.chevDown}`;
+    endBtn.innerHTML = `<span>${draft.end ? fmtDate(draft.end) : "Leave open for now"}</span>${ICON.chevDown}`;
     endMenu.querySelector('[data-end="open"]').setAttribute("aria-checked", !draft.end);
     endMenu.querySelector('[data-end="pick"]').setAttribute("aria-checked", !!draft.end);
   }
@@ -1963,6 +1963,7 @@ function Capture(root) {
   const d = state.momentDraft;
   const today = startOfDay(new Date());
   let rec = null;            // live recording session
+  let settling = false;      // waiting for the last transcript words after Stop
   let player = null;         // <audio> for playing back the voice note
 
   root.innerHTML = `
@@ -2160,12 +2161,15 @@ function Capture(root) {
   /* Two things share the microphone here:
      1) speech recognition → the live transcript (Safari on iPhone uses Siri dictation; Chrome uses Google)
      2) MediaRecorder → the playable voice note + the live waveform
-     Some phones (notably iPhone) won't let both use the mic at once. Speech recognition is started
-     FIRST so the transcript wins; if it then reports the mic is busy, the recorder is released and
-     the transcript carries on (the waveform then follows the words instead of the audio level). */
+     Phones (iPhone and Android) won't reliably let both use the mic at once: whichever grabs it
+     first wins, so the transcript worked only some of the time. On phones we now use speech
+     recognition alone (the waveform follows your voice through the speech events). If the transcript
+     can't run there, it falls back to recording a voice note. On a computer both run together. */
+  const IS_PHONE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   async function startRecording() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+    const hasRecorder = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+    const canRecord = hasRecorder && !(SR && IS_PHONE);
     if (!SR && !canRecord) { toast("Voice recording isn’t supported in this browser"); return; }
     if (!window.isSecureContext) { toast("The microphone only works when the prototype is opened from its https link"); return; }
     stopPlayer();
@@ -2173,7 +2177,7 @@ function Capture(root) {
     const AC = window.AudioContext || window.webkitAudioContext;
     const ctx = canRecord && AC ? new AC() : null;     // create inside the tap so iOS allows audio
     const session = rec = {
-      ctx, chunks: [], levels: [], pulse: 0,
+      ctx, chunks: [], levels: [], pulse: 0, hasRecorder,
       committed: "", session: "", interim: "",
       started: performance.now(),
       canTranscribe: !!SR, note: "",
@@ -2182,13 +2186,14 @@ function Capture(root) {
     renderAdd();
     session.tick = setInterval(sample, 90);
 
-    if (SR) {
-      startSpeech(session, SR);
-      await new Promise(r => setTimeout(r, 400));       // let the transcript claim the mic first
-    }
-    if (rec !== session) return;                        // stopped in the meantime
+    if (SR) startSpeech(session, SR);                   // must start inside the tap on iPhone
     if (!canRecord) return;
+    await startRecorder(session);
+  }
 
+  /* voice note + audio-level waveform (computers, or phones without a working transcript) */
+  async function startRecorder(session) {
+    const ctx = session.ctx;
     try {
       session.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
@@ -2233,20 +2238,31 @@ function Capture(root) {
       sr.continuous = true;
       sr.interimResults = true;
     } catch (_) { session.canTranscribe = false; renderStatus(); return; }
+    session.heard = false;
     sr.onresult = e => {
-      if (rec !== session) return;
+      if (rec !== session && !session.closed) return;      // after Stop we still want the last words
       let fin = "", int = "";
       for (let i = 0; i < e.results.length; i++) {
-        const r = e.results[i];
-        if (r.isFinal) fin += r[0].transcript + " "; else int += r[0].transcript + " ";
+        const r = e.results[i], t = r[0].transcript.trim();
+        if (!t) continue;
+        if (r.isFinal) {
+          /* iPhone sometimes repeats the whole sentence so far in each final result — keep the longest */
+          const sofar = fin.trim();
+          if (sofar && t.toLowerCase().startsWith(sofar.toLowerCase())) fin = t + " ";
+          else if (!sofar.toLowerCase().endsWith(t.toLowerCase())) fin += t + " ";
+        } else int += t + " ";
       }
       session.session = fin; session.interim = int;
-      session.pulse = 1;
-      renderWords();
+      session.pulse = 1; session.heard = true;
+      if (rec === session) renderWords();
     };
+    sr.onsoundstart = sr.onspeechstart = () => { session.pulse = Math.max(session.pulse, 0.7); };
     sr.onerror = ev => {
       if (rec !== session) return;
       const err = ev.error;
+      if (!session.recorder && !session.stream && session.hasRecorder && err !== "no-speech" && err !== "aborted" && !session.heard) {
+        startRecorder(session);                                      // transcript can't run → keep a voice note instead
+      }
       if (err === "no-speech" || err === "aborted") return;          // harmless; onend restarts it
       if (err === "audio-capture" && session.stream) {
         releaseRecorder(session);                                    // mic busy → keep the transcript
@@ -2262,9 +2278,12 @@ function Capture(root) {
       renderStatus(); renderWords();
     };
     sr.onend = () => {                       // browsers stop after a pause — keep going while recording
-      if (rec !== session || session.sr !== sr) return;
-      session.committed += session.session; session.session = ""; session.interim = "";
-      setTimeout(() => { if (rec === session && session.sr === sr) { try { sr.start(); } catch (_) {} } }, 120);
+      if (session.closed || rec !== session || session.sr !== sr) { if (session.onSpeechDone) session.onSpeechDone(); return; }
+      session.committed += session.session + session.interim; session.session = ""; session.interim = "";
+      setTimeout(() => {
+        if (rec !== session || session.sr !== sr) return;
+        try { sr.start(); } catch (_) { try { const again = new SR(); Object.assign(again, { lang: sr.lang, continuous: true, interimResults: true, onresult: sr.onresult, onerror: sr.onerror, onend: sr.onend, onsoundstart: sr.onsoundstart, onspeechstart: sr.onspeechstart }); again.start(); session.sr = again; sr = again; } catch (_) {} }
+      }, 40);
     };
     try { sr.start(); session.sr = sr; }
     catch (_) { session.canTranscribe = false; renderStatus(); }
@@ -2329,11 +2348,23 @@ function Capture(root) {
     const r = rec;
     rec = null;
     clearInterval(r.tick);
-    if (r.sr) { const sr = r.sr; r.sr = null; try { sr.stop(); } catch (_) {} }
     const dur = (performance.now() - r.started) / 1000;
-    const spoken = (r.committed + r.session + r.interim).replace(/\s+/g, " ").trim();
     const recorder = r.recorder;
+    /* phones deliver the last words just AFTER stop — wait for them (up to 1.2s) */
+    const speechDone = new Promise(res => {
+      if (!r.sr || !keep) { if (r.sr) { try { r.sr.abort(); } catch (_) {} } return res(); }
+      const sr = r.sr;
+      r.onSpeechDone = res; r.closed = true;
+      setTimeout(res, 1200);
+      try { sr.stop(); } catch (_) { res(); }
+    });
+    let pending = recorder && recorder.state !== "inactive" ? 2 : 1;
+    if (keep) settling = true;
     const finish = () => {
+      if (--pending > 0) return;
+      settling = false;
+      r.sr = null;
+      const spoken = (r.committed + r.session + r.interim).replace(/\s+/g, " ").trim();
       if (r.stream) r.stream.getTracks().forEach(t => t.stop());
       if (r.ctx) r.ctx.close().catch(() => {});
       if (!keep) return;
@@ -2344,10 +2375,11 @@ function Capture(root) {
       }
       if (spoken) { d.text = d.text.trim() ? `${d.text.trim()} ${spoken}` : spoken; d.transcribed = true; }
       if (!spoken && !(recorder && r.chunks.length)) toast("Nothing was picked up. Try again, a little closer to the mic.");
-      renderComposer();
+      renderComposer(); renderAdd();
     };
-    if (recorder && recorder.state !== "inactive") { recorder.onstop = finish; recorder.stop(); } else finish();
-    if (keep) renderComposer();
+    speechDone.then(finish);
+    if (recorder && recorder.state !== "inactive") { recorder.onstop = finish; recorder.stop(); }
+    if (keep) { renderComposer(); const s = composer.querySelector("textarea"); if (s && r.sr) s.placeholder = "Adding your words…"; renderAdd(); }
   }
 
   /* public timeline */
@@ -2368,7 +2400,7 @@ function Capture(root) {
   /* add moment */
   function renderAdd() {
     const has = d.text.trim() || d.audio || d.images.length || d.place;
-    $("#cap-add").disabled = !!rec || !has;
+    $("#cap-add").disabled = !!rec || settling || !has;
   }
   $("#cap-add").addEventListener("click", () => {
     let c = chapter();
