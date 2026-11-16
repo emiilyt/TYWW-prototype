@@ -452,6 +452,12 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 }
 .menu button:active, .menu button:hover { background: var(--paper-2); }
 .menu button svg { width: 16px; height: 16px; visibility: hidden; }
+.tl-ch-row { position: relative; }
+.ch-menu { left: auto; right: 0; top: 100%; width: 220px; animation: fade .15s ease; }
+.ch-menu button { justify-content: flex-start; gap: 10px; font-size: 15px; color: var(--navy); }
+.ch-menu button svg { visibility: visible; width: 18px; height: 18px; flex: none; }
+.ch-menu hr { border: 0; border-top: 1px solid #e4e2dd; margin: 4px 6px; }
+.ch-menu .danger { color: #b3261e; }
 .menu button[aria-checked="true"] svg { visibility: visible; }
 
 /* Date picker sheet */
@@ -2690,7 +2696,7 @@ function chapterProgress(c, at = startOfDay(new Date())) {
   const total = Math.max(1, Math.round((startOfDay(c.end) - startOfDay(c.start)) / DAY_MS) + 1);
   return { day: Math.min(day, total), total, pct: Math.max(3, Math.min(100, (Math.min(day, total) / total) * 100)) };
 }
-const isClosed = c => c.end && startOfDay(c.end) < startOfDay(new Date());
+const isClosed = c => !!c.closed || (c.end && startOfDay(c.end) < startOfDay(new Date()));
 const momentsIn = view => state.moments.filter(m => view === "all" || (view === "none" ? m.chapterId === null : m.chapterId === view));
 const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
@@ -2861,7 +2867,7 @@ function MyTimeline(root) {
     let meta, day = "", bar = "";
     if (info.chapter) {
       const c = info.chapter, p = chapterProgress(c);
-      meta = `<span>${ordOf(c.start)}${c.end ? ` to ${ordOf(c.end)}` : " · open"}</span><i></i><span>${plural(ms.length, "moment")}</span>`;
+      meta = `<span>${ordOf(c.start)}${c.end ? ` to ${ordOf(c.end)}` : " · open"}${isClosed(c) ? " · closed" : ""}</span><i></i><span>${plural(ms.length, "moment")}</span>`;
       bar = `<div class="tl-progress" role="progressbar" aria-valuenow="${Math.round(p.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="Chapter progress"><span style="width:${p.pct}%; background:${info.colour}"></span></div>`;
       day = `<p class="tl-day">${p.total ? `Day ${p.day} of ${p.total}` : `Day ${p.day}`}</p>`;
     } else if (state.timelineView === "none") {
@@ -2882,7 +2888,79 @@ function MyTimeline(root) {
       <div class="tl-meta">${meta}</div>
       ${bar}${day}`;
     $("#tl-switch").addEventListener("click", () => openChapterSwitcher(() => { renderChapter(); renderStream(); }));
-    $("#tl-more").addEventListener("click", () => toast("Chapter options are coming soon"));
+    $("#tl-more").addEventListener("click", e => {
+      e.stopPropagation();
+      if (!info.chapter) return toast("Pick a chapter to see its options");
+      openChapterMenu(info.chapter);
+    });
+  }
+
+  /* ⋮ menu: change end date, close / reopen, delete */
+  let closeMenu = () => {};
+  function openChapterMenu(c) {
+    if (root.querySelector(".ch-menu")) return closeMenu();
+    const row = root.querySelector(".tl-ch-row");
+    const menu = document.createElement("div");
+    menu.className = "menu ch-menu"; menu.setAttribute("role", "menu");
+    menu.innerHTML = `
+      <button role="menuitem" data-act="end">${SVG.calDue}<span>Change end date</span></button>
+      <button role="menuitem" data-act="close">${SVG.lockSm}<span>${isClosed(c) ? "Reopen chapter" : "Close chapter"}</span></button>
+      <hr>
+      <button role="menuitem" data-act="delete" class="danger">${SVG.trashSm}<span>Delete chapter</span></button>`;
+    row.appendChild(menu);
+    $("#tl-more").setAttribute("aria-expanded", "true");
+    const away = e => { if (!menu.contains(e.target)) closeMenu(); };
+    const esc_ = e => { if (e.key === "Escape") closeMenu(); };
+    setTimeout(() => document.addEventListener("pointerdown", away), 0);
+    document.addEventListener("keydown", esc_);
+    closeMenu = () => {
+      menu.remove(); document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc_);
+      const b = $("#tl-more"); if (b) b.setAttribute("aria-expanded", "false");
+      closeMenu = () => {};
+    };
+    menu.querySelector("button").focus();
+    menu.addEventListener("click", e => {
+      const b = e.target.closest("[data-act]"); if (!b) return;
+      closeMenu();
+      const redraw = () => { renderChapter(); renderStream(); };
+      if (b.dataset.act === "end") {
+        openDatePicker({ title: "Change end date", value: c.end, min: c.start, onDone: d => {
+          c.end = d; c.closed = false; delete c.endBeforeClose; redraw();
+          toast(`${c.name} now ends on ${ordOf(d)}`);
+        } });
+      } else if (b.dataset.act === "close") {
+        if (isClosed(c)) {
+          c.closed = false;
+          if ("endBeforeClose" in c) { c.end = c.endBeforeClose; delete c.endBeforeClose; }
+          if (c.end && startOfDay(c.end) < today) c.end = null;
+          redraw(); toast(`${c.name} is open again`);
+        } else {
+          c.closed = true; c.endBeforeClose = c.end;
+          if (!c.end || c.end > today) c.end = today;
+          redraw(); toast(`${c.name} is closed`);
+        }
+      } else confirmDeleteChapter(c);
+    });
+  }
+
+  function confirmDeleteChapter(c) {
+    const n = state.moments.filter(m => m.chapterId === c.id).length;
+    const sheet = openBigSheet(`
+      <div class="sheet-title"><h3>Delete ${esc(c.name)}?</h3>
+        <p>${n ? `Your ${plural(n, "moment")} won’t be deleted. ${n === 1 ? "It moves" : "They move"} to Day to day, so you can add ${n === 1 ? "it" : "them"} to another chapter later.` : "This chapter has no moments yet."} This can’t be undone.</p></div>
+      <button class="danger-btn" id="chd-yes">Delete chapter</button>
+      <button class="sheet-link" id="chd-no">Cancel</button>`, "Delete chapter");
+    sheet.querySelector("#chd-no").addEventListener("click", () => closeBigSheet());
+    sheet.querySelector("#chd-yes").addEventListener("click", () => {
+      state.moments.forEach(m => { if (m.chapterId === c.id) m.chapterId = null; });
+      state.chapters.splice(state.chapters.indexOf(c), 1);
+      if (state.captureChapterId === c.id) state.captureChapterId = null;
+      if (state.chapter === c) state.chapter = state.chapters[0] || null;
+      state.timelineView = state.chapters[0] ? state.chapters[0].id : "none";
+      closeBigSheet();
+      toast(`${c.name} deleted`);
+      renderChapter(); renderStream();
+    });
   }
 
   function momentCard(m, inBoth, loose) {
@@ -3277,6 +3355,10 @@ Object.assign(SVG, {
   dotsLg: `<svg viewBox="0 0 24 24" fill="var(--navy)" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>`,
 });
 /* a stable, believable "One of N recorded on this day" number for the prototype */
+Object.assign(SVG, {
+  lockSm: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`,
+  trashSm: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`,
+});
 const recordedOnDay = d => 30 + ((d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) * 7) % 41;
 
 function MomentView(root, id) {
