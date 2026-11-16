@@ -1955,7 +1955,7 @@ const MORE_PROMPTS = [
 ];
 const fmtDur = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const findChapter = id => state.chapters.find(c => c.id === id) || null;
-const newMomentDraft = () => ({ text: "", audio: null, images: [], place: null, isPublic: true, anon: true, promptIndex: 0 });
+const newMomentDraft = () => ({ text: "", audio: null, images: [], place: null, isPublic: false, anon: true, promptIndex: 0 });
 
 /* ---------- Capture a moment ---------- */
 function Capture(root) {
