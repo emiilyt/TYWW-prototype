@@ -834,6 +834,9 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 }
 .sheet.big > * { flex: none; }
 .handle { align-self: center; width: 44px; height: 5px; border-radius: 3px; background: var(--nav-active); }
+.sheet.big .handle { position: relative; touch-action: none; cursor: grab; }
+.sheet.big .handle::before { content: ""; position: absolute; inset: -16px -120px -12px; }
+.sheet.big .sheet-title h3 { touch-action: none; }
 .sheet-title { display: flex; flex-direction: column; gap: 10px; }
 .sheet-title h3 { margin: 0; font: 700 28px/34px var(--font-serif); }
 .sheet-title p { font: 600 16px/22px var(--font-sans); color: var(--navy-soft); }
@@ -944,7 +947,7 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .tl-chapter .eyebrow { font: 700 18px/15px var(--font-sans); }
 .tl-ch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); }
 .tl-ch-name { display: flex; align-items: center; gap: var(--s-8); min-width: 0; }
-.tl-ch-name h1 { font: var(--t-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-ch-name h1 { font: var(--t-display); line-height: 42px; padding-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font: 600 16px/18px var(--font-sans); color: var(--navy-soft); }
 .tl-meta i, .mc-meta i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .tl-progress { height: 12px; border-radius: var(--radius-pill); background: var(--paper-2); overflow: hidden; }
@@ -979,7 +982,7 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .mc-meta .ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; flex: none; }
 .mc-meta .ico svg { width: 20px; height: 20px; }
 .mc-meta span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mc-text { font: 700 16px/21px var(--font-sans); color: var(--navy-soft); white-space: pre-wrap; overflow-wrap: anywhere; }
+.mc-text { font: 700 16px/21px var(--font-sans); color: var(--navy-soft); white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .mc-voice { align-self: flex-start; display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 8px; background: #e4e2dd; font: 600 14px/18px var(--font-sans); color: var(--navy-soft); }
 .mc-voice svg { width: 18px; height: 18px; }
 .mc-voice .wave-s { display: flex; align-items: center; gap: 2px; }
@@ -1025,7 +1028,7 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .sim-meta i { flex: none; width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
 .sim-place { display: inline-flex; align-items: center; gap: 3px; }
 .sim-place svg { width: 16px; height: 16px; }
-.sim-text { font: 700 17px/22px var(--font-sans); color: var(--navy); }
+.sim-text { font: 700 17px/22px var(--font-sans); color: var(--navy); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
 .sim .pp-save { margin-top: auto; }
 .sim.on-orange, .sim.on-orange .sim-meta { color: var(--navy); }
 .sim-photo { height: 84px; border-radius: 10px; }
@@ -1105,7 +1108,7 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .pp.on-orange { color: #030202; }
 .pp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; font: 600 14px/16px var(--font-sans); }
 .pp-meta i { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
-.pp-text { font: 700 16px/20px var(--font-sans); }
+.pp-text { font: 700 16px/20px var(--font-sans); display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
 .pp { background: var(--card, var(--pub-3)); }
 /* image band: a deeper shade of whatever colour the card is */
 .pp-photo { display: grid; place-items: center; height: 45px; border-radius: 2px; background: rgba(1, 44, 79, 0.12); background: color-mix(in srgb, var(--card, var(--pub-3)) 84%, #012c4f); }
@@ -1167,6 +1170,11 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .mv-actions { display: flex; gap: var(--s-8); }
 .mv-actions button { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--white); box-shadow: var(--elevation-1); }
 .mv-actions svg { width: 24px; height: 24px; }
+.mv-photo-ph { display: grid; place-items: center; height: 220px; border-radius: var(--radius-lg); background: rgba(1, 44, 79, 0.12); background: color-mix(in srgb, var(--card) 84%, #012c4f); }
+.mv-photo-ph.on-orange { background: color-mix(in srgb, var(--card) 80%, #7a1e00); }
+.mv-photo-ph svg { width: 40px; height: 40px; }
+.pp[data-pub] { cursor: pointer; }
+.pp[data-pub]:active { transform: scale(.99); }
 .mc { cursor: pointer; }
 .mc:active { transform: scale(.99); }
 .danger-btn { display: flex; align-items: center; justify-content: center; min-height: 56px; border-radius: var(--radius-lg); background: #b3261e; color: var(--white); font: 700 18px/20px var(--font-sans); }
@@ -2440,7 +2448,35 @@ function openBigSheet(inner, label) {
   document.addEventListener("keydown", onKey);
   wrap.addEventListener("click", e => { if (e.target === wrap) closeBigSheet(); });
   closeBigSheet = () => { wrap.remove(); document.removeEventListener("keydown", onKey); closeBigSheet = () => {}; };
-  return wrap.querySelector(".sheet");
+  const close = closeBigSheet;
+  /* pull the handle (or the title) down to close */
+  const sh = wrap.querySelector(".sheet");
+  let y0 = null, dy = 0, t0 = 0;
+  sh.addEventListener("pointerdown", e => {
+    if (!e.target.closest(".handle, .sheet-title h3")) return;
+    y0 = e.clientY; dy = 0; t0 = Date.now();
+    try { sh.setPointerCapture(e.pointerId); } catch (_) {}
+    sh.style.transition = "none"; sh.style.animation = "none";
+  });
+  sh.addEventListener("pointermove", e => {
+    if (y0 === null) return;
+    dy = Math.max(0, e.clientY - y0);
+    sh.style.transform = `translateY(${dy}px)`;
+  });
+  const end = () => {
+    if (y0 === null) return;
+    y0 = null;
+    const flick = dy > 30 && dy / Math.max(1, Date.now() - t0) > 0.5;
+    sh.style.transition = "transform .22s cubic-bezier(.22,.8,.24,1)";
+    if (dy > 90 || flick) {
+      sh.style.transform = "translateY(105%)";
+      wrap.style.transition = "opacity .22s"; wrap.style.opacity = "0";
+      setTimeout(close, 220);
+    } else sh.style.transform = "";
+  };
+  sh.addEventListener("pointerup", end);
+  sh.addEventListener("pointercancel", end);
+  return sh;
 }
 
 /* "Give this moment a chapter" */
@@ -2736,6 +2772,7 @@ function similarFor(day, mine) {
     .map((x, i) => ({ ...x.p, colour: PUB_COLOURS[(i + 3) % PUB_COLOURS.length] }));
 }
 
+const PUB_OPEN = new Map();     // public posts that can be opened, by key
 function publicPool(day) {
   return [...ownPublic(day), ...samplePool(day)];
 }
@@ -2757,7 +2794,7 @@ function samplePool(day) {
       when = hhmm(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 22, 30 - i * 31));
     }
     return {
-      key: `${seed}-${i}`, text, who, where, chapter, when, dateLabel,
+      key: `${seed}-${i}`, text, who, where, chapter, when, dateLabel, date: day,
       photo: i % 5 === 2,
       colour: PUB_COLOURS[i % PUB_COLOURS.length],
     };
@@ -2903,10 +2940,12 @@ function MyTimeline(root) {
     });
   }
 
-  function publicCard(p, compact) {
+  function publicCard(p, compact, openable) {
     const saved = state.saved.has(p.key);
+    const open = !p.own && openable;
+    if (open) PUB_OPEN.set(p.key, p);
     return `
-      <article class="pp ${compact ? "sm" : ""} ${p.colour === "--pub-4" ? "on-orange" : ""}" style="--card: var(${p.colour})"${p.own ? ` data-moment="${p.own}" tabindex="0"` : ""}>
+      <article class="pp ${compact ? "sm" : ""} ${p.colour === "--pub-4" ? "on-orange" : ""}" style="--card: var(${p.colour})"${p.own ? ` data-moment="${p.own}" tabindex="0"` : open ? ` data-pub="${p.key}" role="link" tabindex="0" aria-label="Open moment from ${esc(p.who)}"` : ""}>
         <p class="pp-meta">${[p.who, p.where, ...(compact ? [] : [p.when, p.dateLabel])].filter(Boolean).map(t => `<span>${esc(t)}</span>`).join("<i></i>")}</p>
         ${p.text ? `<p class="pp-text">${esc(p.text)}</p>` : ""}
         ${p.img ? `<img class="pp-photo pp-img" src="${p.img}" alt="Photo">` : p.photo ? `<div class="pp-photo" aria-label="Photo">${SVG.photoCard}</div>` : ""}
@@ -2984,7 +3023,7 @@ function MyTimeline(root) {
     const grid = mode === "public" && state.publicView === "grid";
     let items;
     if (mode === "mine") items = mine;
-    else if (mode === "public") items = shown.map(p => publicCard(p, grid));
+    else if (mode === "public") items = shown.map((p, i) => publicCard(p, grid, i < 6));
     else { items = []; const pub = shown.map(p => publicCard(p, false)); const n = Math.max(mine.length, pub.length); for (let i = 0; i < n; i++) { if (mine[i]) items.push(mine[i]); if (pub[i]) items.push(pub[i]); } }
     stream.classList.toggle("grid", grid);
     const more = mode !== "mine" && shown.length < pool.length
@@ -3037,6 +3076,8 @@ function MyTimeline(root) {
   $("#tl-stream").addEventListener("keydown", e => {
     const card = e.target.closest("[data-moment]");
     if (card && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); location.hash = `#moment/${card.dataset.moment}`; }
+    const pc = e.target.closest("[data-pub]");
+    if (pc && e.target === pc && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); location.hash = `#pub/${pc.dataset.pub}`; }
   });
   $("#tl-stream").addEventListener("click", e => {
     if (e.target.closest("#tl-more-pub")) return loadMore();
@@ -3067,6 +3108,8 @@ function MyTimeline(root) {
     }
     const b = e.target.closest("[data-play]");
     if (!b) {
+      const pc = e.target.closest("[data-pub]");
+      if (pc) { location.hash = `#pub/${pc.dataset.pub}`; return; }
       const card = e.target.closest("[data-moment]");
       if (card) location.hash = `#moment/${card.dataset.moment}`;    // open the full view
       return;
@@ -3336,6 +3379,58 @@ function MomentView(root, id) {
   return () => { cancelAnimationFrame(raf); if (audio) audio.pause(); closeBigSheet(); };
 }
 
+/* ---------- Someone else's public moment, in the same full-view layout ---------- */
+function PublicMomentView(root, key) {
+  const p = PUB_OPEN.get(key);
+  if (!p) { location.hash = "#timeline"; return; }
+  const d = p.date || new Date();
+  const captured = `${ordinal(d.getDate())} ${MONTHS[d.getMonth()]}`;
+  const colour = `var(${p.colour})`;
+  root.innerHTML = `
+    <div class="mv">
+      <div class="home-top">
+        <div class="brand">${logo}<span>TYWW</span></div>
+        <a class="round-btn" href="#menu" aria-label="Menu">${SVG.menu}</a>
+      </div>
+      <div><button class="round-btn" id="mv-back" aria-label="Back to the public timeline">${SVG.chevLeftWhite}</button></div>
+      <div class="mv-sticker">${momentSticker(p.photo ? "photo" : "write", colour)}</div>
+      <div class="mv-head">
+        <p class="ch">Chapter: ${esc(p.chapter)}</p>
+        <h1>Captured ${captured}</h1>
+      </div>
+      ${p.photo ? `<div class="mv-photo-ph ${p.colour === "--pub-4" ? "on-orange" : ""}" style="--card:${colour}" aria-label="Photo">${SVG.photoCard}</div>` : ""}
+      <p class="mv-text" style="margin-top:0">${esc(p.text)}</p>
+      <div class="mv-info">
+        ${p.where ? `<p class="mv-place">${SVG.pinPill}${esc(p.where)}</p>` : ""}
+        <p class="mv-when"><b>${esc(p.when)}</b><i></i><span>Shared by ${esc(p.who)}</span></p>
+      </div>
+      <div class="mv-actions">
+        <button id="mv-save"></button>
+        <button id="mv-share" aria-label="Share">${SVG.shareLg}</button>
+      </div>
+    </div>`;
+  const $ = s => root.querySelector(s);
+  $("#mv-back").addEventListener("click", () => { if (history.length > 1) history.back(); else location.hash = "#timeline"; });
+  const paintSave = () => {
+    const on = state.saved.has(p.key);
+    $("#mv-save").innerHTML = on ? SVG.bookmarkFilled : SVG.bookmark;
+    $("#mv-save").setAttribute("aria-pressed", on);
+    $("#mv-save").setAttribute("aria-label", on ? "Remove from saved" : "Save this moment");
+  };
+  paintSave();
+  $("#mv-save").addEventListener("click", () => {
+    const on = !state.saved.has(p.key);
+    on ? state.saved.add(p.key) : state.saved.delete(p.key);
+    paintSave();
+    toast(on ? "Saved — find it in Saved" : "Removed from saved");
+  });
+  $("#mv-share").addEventListener("click", async () => {
+    if (navigator.share) { try { await navigator.share({ text: p.text }); } catch (_) {} }
+    else toast("Sharing isn’t available in this browser");
+  });
+  return () => closeBigSheet();
+}
+
 /* ---------- Settings: facilitator sets the tester's name ---------- */
 function Settings(root) {
   root.innerHTML = `
@@ -3400,6 +3495,7 @@ const ROUTES = {
   "chapter":         { view: ChapterSetup },
   "timeline":        { view: Timeline, tabs: true },
   "moment":          { view: MomentView, tabs: true, tab: "timeline" },
+  "pub":             { view: PublicMomentView, tabs: true, tab: "timeline" },
   "capture":         { view: Capture, tabs: true },
   "predictions":     { view: Placeholder("Predictions", "Not built yet."), tabs: true },
   "saved":           { view: Placeholder("Saved", "Moments you bookmark from the public timeline will live here. Not built yet."), tabs: true },
