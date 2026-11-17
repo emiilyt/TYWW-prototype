@@ -1176,6 +1176,17 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .mv-actions { display: flex; gap: var(--s-8); }
 .mv-actions button { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--white); box-shadow: var(--elevation-1); }
 .mv-actions svg { width: 24px; height: 24px; }
+/* share sheet */
+.share-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.share-head h3 { margin: 0; max-width: 250px; font: 700 24px/29px var(--font-serif); color: var(--navy); }
+.share-head .sheet-link { flex: none; padding: 4px 0; font-size: 15px; }
+.share-quote { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: var(--radius-lg); }
+.share-quote p { font: 600 17px/24px var(--font-sans); color: var(--navy-soft); display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.share-quote span { font: 700 14px/16px var(--font-sans); color: var(--navy); }
+.share-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.share-tiles button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 104px; border-radius: var(--radius-lg); background: var(--white); box-shadow: var(--elevation-1); font: 700 14px/16px var(--font-sans); color: var(--navy); }
+.share-tiles button:active { transform: scale(.97); }
+.share-tiles svg { width: 28px; height: 28px; }
 .mv-photo-ph { display: grid; place-items: center; height: 220px; border-radius: var(--radius-lg); background: rgba(1, 44, 79, 0.12); background: color-mix(in srgb, var(--card) 84%, #012c4f); }
 .mv-photo-ph.on-orange { background: color-mix(in srgb, var(--card) 80%, #7a1e00); }
 .mv-photo-ph svg { width: 40px; height: 40px; }
@@ -3437,10 +3448,10 @@ function MomentView(root, id) {
     });
   }
 
-  $("#mv-share").addEventListener("click", async () => {
-    const text = m.text.trim();
-    if (navigator.share && text) { try { await navigator.share({ text }); } catch (_) {} }
-    else toast(text ? "Sharing isn’t available in this browser" : "There’s no text to share on this moment");
+  $("#mv-share").addEventListener("click", () => {
+    const text = m.text.trim() || (m.audio ? "A voice note" : m.images.length ? "A photo" : "");
+    if (!text) return toast("There’s no text to share on this moment");
+    openShareSheet({ text, who: state.userName || "Me", where: m.place, bg: `color-mix(in srgb, ${colour} 40%, var(--paper))` });
   });
   $("#mv-edit").addEventListener("click", () => toast("Editing a moment is coming soon"));
   $("#mv-more").addEventListener("click", () => {
@@ -3460,6 +3471,43 @@ function MomentView(root, id) {
 
   return () => { cancelAnimationFrame(raf); if (audio) audio.pause(); closeBigSheet(); };
 }
+
+/* ---------- "Send this moment to someone you know" ---------- */
+function openShareSheet({ text, who, where, bg }) {
+  const by = [who, where].filter(Boolean).join(" • ");
+  const message = `“${text}”\n— ${by}\n\nShared from The Year We Were`;
+  const link = location.href;
+  const sheet = openBigSheet(`
+    <div class="share-head">
+      <h3>Send this moment to someone you know</h3>
+      <button class="sheet-link" id="sh-close">Close</button>
+    </div>
+    <div class="share-quote" style="background:${bg}">
+      <p>${esc(text)}</p>
+      <span>${esc(by)}</span>
+    </div>
+    <div class="share-tiles">
+      <button data-via="whatsapp">${SVG.whatsapp}<span>WhatsApp</span></button>
+      <button data-via="sms">${SVG.message}<span>Message</span></button>
+      <button data-via="link">${SVG.link}<span>Link</span></button>
+    </div>`, "Share this moment");
+  sheet.querySelector("#sh-close").addEventListener("click", () => closeBigSheet());
+  sheet.querySelector(".share-tiles").addEventListener("click", async e => {
+    const b = e.target.closest("[data-via]"); if (!b) return;
+    const via = b.dataset.via;
+    if (via === "whatsapp") { window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank"); closeBigSheet(); }
+    else if (via === "sms") { location.href = `sms:?&body=${encodeURIComponent(message)}`; closeBigSheet(); }
+    else {
+      try { await navigator.clipboard.writeText(link); toast("Link copied"); closeBigSheet(); }
+      catch (_) { toast("Couldn’t copy the link in this browser"); }
+    }
+  });
+}
+Object.assign(SVG, {
+  whatsapp: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 20.5l1.3-4A8.5 8.5 0 1 1 8 19.6l-4.5.9z"/><path d="M9 8.6c.2-.5.6-.6.9-.6h.4c.2 0 .3.1.4.3l.7 1.6c.1.2 0 .4-.1.6l-.5.6c-.1.1-.1.3 0 .5.6 1.1 1.5 1.9 2.6 2.5.2.1.4.1.5-.1l.6-.6c.2-.2.4-.2.6-.1l1.6.8c.2.1.3.2.3.4v.4c0 .4-.2.8-.6 1-.6.3-1.4.4-2.3.1-2.4-.8-4.3-2.6-5.2-4.9-.3-.9-.2-1.8.1-2.5z"/></svg>`,
+  message: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5c4.9 0 8.5 3.3 8.5 7.6s-3.6 7.6-8.5 7.6c-1 0-2-.1-2.9-.4L4.5 20.5l1.1-3.8C4.3 15.3 3.5 13.3 3.5 11.1 3.5 6.8 7.1 3.5 12 3.5z"/></svg>`,
+  link: `<svg viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"/></svg>`,
+});
 
 /* ---------- Someone else's public moment, in the same full-view layout ---------- */
 function PublicMomentView(root, key) {
@@ -3506,10 +3554,7 @@ function PublicMomentView(root, key) {
     paintSave();
     toast(on ? "Saved — find it in Saved" : "Removed from saved");
   });
-  $("#mv-share").addEventListener("click", async () => {
-    if (navigator.share) { try { await navigator.share({ text: p.text }); } catch (_) {} }
-    else toast("Sharing isn’t available in this browser");
-  });
+  $("#mv-share").addEventListener("click", () => openShareSheet({ text: p.text, who: p.who, where: p.where, bg: colour }));
   return () => closeBigSheet();
 }
 
