@@ -917,6 +917,8 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
   font: 600 16px/20px var(--font-sans); color: var(--navy);
 }
 .pl-item.add { font-weight: 700; }
+.pl-note { padding: 14px 0; font: 600 15px/21px var(--font-sans); color: var(--navy-soft); }
+.pl-off { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-bottom: 8px; }
 
 /* ============================================================
    MY TIMELINE (after the first moment)
@@ -2620,10 +2622,77 @@ function openChapterSheet(onDone, opts = {}) {
 }
 
 /* "Tag a place" */
+/* Nearby places come from the device's real location (only if the tester has location on),
+   looked up on OpenStreetMap. No location, no made-up suggestions. */
+const GEO = { pos: null, area: null, nearby: null };
+const OSM = "https://nominatim.openstreetmap.org";
+function withTimeout(ms) { const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal; }
+function getPosition() {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(new Error("none"));
+    navigator.geolocation.getCurrentPosition(p => { GEO.pos = { lat: p.coords.latitude, lon: p.coords.longitude }; res(GEO.pos); }, rej,
+      { timeout: 10000, maximumAge: 300000, enableHighAccuracy: false });
+  });
+}
+async function geoPermission() {
+  try { return (await navigator.permissions.query({ name: "geolocation" })).state; } catch (_) { return "unknown"; }
+}
+async function areaName({ lat, lon }) {
+  if (GEO.area) return GEO.area;
+  try {
+    const r = await fetch(`${OSM}/reverse?format=jsonv2&zoom=16&accept-language=en&lat=${lat}&lon=${lon}`, { signal: withTimeout(8000) });
+    const a = (await r.json()).address || {};
+    const local = a.suburb || a.neighbourhood || a.quarter || a.village || a.hamlet;
+    const town = a.town || a.city || a.county;
+    GEO.area = [local, town].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join(", ") || null;
+  } catch (_) {}
+  return GEO.area;
+}
+const distM = (a, b) => { const k = Math.PI / 180, x = (b.lon - a.lon) * k * Math.cos((a.lat + b.lat) * k / 2), y = (b.lat - a.lat) * k; return Math.sqrt(x * x + y * y) * 6371000; };
+/* nearby named places (parks, cafés, landmarks…) from Photon, an OpenStreetMap lookup */
+const PHOTON = "https://photon.komoot.io";
+/* only the kinds of places people tag a moment with, best first */
+const PLACE_KINDS = {
+  leisure: ["park", "garden", "nature_reserve", "marina", "beach_resort", "playground", "stadium", "pitch", "sports_centre", "common"],
+  tourism: ["attraction", "museum", "gallery", "viewpoint", "zoo", "theme_park", "aquarium"],
+  historic: ["castle", "monument", "memorial", "ruins", "church", "abbey", "fort", "building", "archaeological_site"],
+  natural: ["beach", "bay", "peak", "water", "wood", "cliff", "cape"],
+  place: ["square", "neighbourhood", "suburb", "quarter", "village", "island"],
+  railway: ["station"],
+  amenity: ["cafe", "pub", "restaurant", "bar", "library", "theatre", "cinema", "arts_centre", "marketplace", "place_of_worship", "university", "college", "ice_cream", "community_centre", "ferry_terminal"],
+  shop: ["mall", "supermarket", "department_store", "bakery", "books"],
+};
+const kindRank = p => { const v = PLACE_KINDS[p.osm_key]; return v && v.includes(p.osm_value) ? (["amenity", "shop"].includes(p.osm_key) ? 1 : 0) : -1; };
+async function nearbyPlaces(pos) {
+  if (GEO.nearby) return GEO.nearby;
+  const [area, named] = await Promise.all([areaName(pos), (async () => {
+    try {
+      const r = await fetch(`${PHOTON}/reverse?lat=${pos.lat}&lon=${pos.lon}&limit=100&radius=1.5&lang=en`, { signal: withTimeout(8000) });
+      const seen = new Set();
+      return ((await r.json()).features || [])
+        .map(f => ({ p: f.properties, d: distM(pos, { lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }) }))
+        .filter(({ p }) => p.name && kindRank(p) >= 0 && p.name !== p.street && !/\d{2}/.test(p.name))
+        .sort((x, y) => (x.d + kindRank(x.p) * 250) - (y.d + kindRank(y.p) * 250))
+        .filter(({ p }) => { const k = p.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+        .slice(0, 7).map(({ p }) => p.name);
+    } catch (_) { return []; }
+  })()]);
+  GEO.nearby = [...(area ? [area] : []), ...named];
+  return GEO.nearby;
+}
+async function searchPlaces(term) {
+  const near = GEO.pos ? `&lat=${GEO.pos.lat}&lon=${GEO.pos.lon}` : "";
+  const r = await fetch(`${PHOTON}/api?q=${encodeURIComponent(term)}&limit=8&lang=en${near}`, { signal: withTimeout(8000) });
+  const seen = new Set();
+  return ((await r.json()).features || []).map(f => {
+    const p = f.properties, where = p.city || p.town || p.village || p.county || p.state || p.country;
+    return [p.name || p.street, where !== p.name ? where : null].filter(Boolean).join(", ");
+  }).filter(n => n && !seen.has(n) && seen.add(n));
+}
+
 function openPlaceSheet(value, onDone) {
   /* layout follows "Add a place bottom sheet": header + Cancel, search, current location, Nearby list */
-  const NEARBY = ["Cork City", "Fitzgerald’s Park", "The English Market", "Blackrock Pier", "Wexford Town", "Rosslare"];
-  const MORE = ["Home", "Work", "Gran’s house", "The beach", "Dublin", "Galway", "Kinsale", "Cobh", "Youghal", "Kilkenny", "Limerick", "Waterford", "Sligo", "Dingle", "Killarney", "Phoenix Park", "Howth"];
+  const PERSONAL = ["Home", "Work", "Gran’s house", "School"];
   const sheet = openBigSheet(`
     <div class="pl-head">
       <h3>Add a location</h3>
@@ -2647,35 +2716,81 @@ function openPlaceSheet(value, onDone) {
 
   const q = sheet.querySelector("#pl-q");
   const results = sheet.querySelector("#pl-results");
+  let nearby = GEO.nearby, status = GEO.nearby ? "ready" : "checking", found = [], searching = false, timer = 0, seq = 0;
+  const item = p => `<button class="pl-item" data-place="${esc(p)}">${esc(p)}</button>`;
+
   function render() {
-    const term = q.value.trim().toLowerCase();
-    let items = term ? [...NEARBY, ...MORE].filter(p => p.toLowerCase().includes(term)) : NEARBY;
-    const exact = items.some(p => p.toLowerCase() === term);
+    if (!sheet.isConnected) return;
+    const raw = q.value.trim(), term = raw.toLowerCase();
     sheet.querySelector("#pl-label").textContent = term ? "Results" : "Nearby";
-    results.innerHTML =
-      (term && !exact ? `<button class="pl-item add" data-place="${esc(q.value.trim())}">Add “${esc(q.value.trim())}”</button>` : "") +
-      items.slice(0, 8).map(p => `<button class="pl-item" data-place="${esc(p)}">${esc(p)}</button>`).join("");
+    if (term) {
+      const local = [...PERSONAL, ...(nearby || [])].filter(p => p.toLowerCase().includes(term));
+      const items = [...local, ...found.filter(f => !local.includes(f))];
+      const exact = items.some(p => p.toLowerCase() === term);
+      results.innerHTML =
+        (!exact ? `<button class="pl-item add" data-place="${esc(raw)}">Add “${esc(raw)}”</button>` : "") +
+        items.slice(0, 8).map(item).join("") +
+        (searching ? `<p class="pl-note">Searching…</p>` : "");
+      return;
+    }
+    if (status === "ready" && nearby && nearby.length) results.innerHTML = nearby.map(item).join("");
+    else if (status === "ready") results.innerHTML = `<p class="pl-note">Couldn’t find named places near you. Search instead.</p>`;
+    else if (status === "loading" || status === "checking") results.innerHTML = `<p class="pl-note">${status === "loading" ? "Finding places near you…" : ""}</p>`;
+    else if (status === "denied") results.innerHTML = `<p class="pl-note">Location is off, so we can’t suggest places near you. Turn it on in your phone’s settings, or search for a place above.</p>`;
+    else results.innerHTML = `<div class="pl-off"><p class="pl-note">Turn on location to see places near you.</p><button class="pill-btn" id="pl-allow">Show places near me</button></div>`;
   }
-  q.addEventListener("input", render);
+
+  async function loadNearby() {
+    status = "loading"; render();
+    try {
+      const pos = GEO.pos || await getPosition();
+      nearby = await nearbyPlaces(pos);
+      status = "ready";
+    } catch (e) {
+      status = e && e.code === 1 ? "denied" : "off";
+    }
+    render();
+  }
+
+  q.addEventListener("input", () => {
+    clearTimeout(timer); found = [];
+    const term = q.value.trim(), my = ++seq;
+    searching = term.length >= 3;
+    render();
+    if (!searching) return;
+    timer = setTimeout(async () => {
+      try { const r = await searchPlaces(term); if (my === seq) found = r; } catch (_) {}
+      if (my === seq) { searching = false; render(); }
+    }, 400);
+  });
   q.addEventListener("keydown", e => { if (e.key === "Enter" && q.value.trim()) { closeBigSheet(); onDone(q.value.trim()); } });
   results.addEventListener("click", e => {
+    if (e.target.closest("#pl-allow")) return loadNearby();
     const b = e.target.closest("[data-place]");
     if (b) { closeBigSheet(); onDone(b.dataset.place); }
   });
   sheet.querySelector("#pl-cancel").addEventListener("click", () => closeBigSheet());
-  sheet.querySelector("#pl-current").addEventListener("click", () => {
+  sheet.querySelector("#pl-current").addEventListener("click", async () => {
     if (!navigator.geolocation) { toast("Location isn’t available in this browser"); return; }
     const label = sheet.querySelector(".pl-current-text");
     label.textContent = "Finding you…";
-    navigator.geolocation.getCurrentPosition(
-      () => { closeBigSheet(); onDone("Current location"); },
-      () => { label.textContent = "Use current location"; toast("Location access is off. Allow it in your browser settings, or search instead."); },
-      { timeout: 10000, maximumAge: 60000 }
-    );
+    try {
+      const pos = GEO.pos || await getPosition();
+      const name = await areaName(pos);
+      closeBigSheet(); onDone(name || "Current location");
+    } catch (e) {
+      label.textContent = "Use current location";
+      if (e && e.code === 1) { status = "denied"; render(); }
+      toast("Location access is off. Allow it in your settings, or search instead.");
+    }
   });
   const rm = sheet.querySelector("#pl-rm");
   if (rm) rm.addEventListener("click", () => { closeBigSheet(); onDone(null); });
   render();
+  if (!nearby) geoPermission().then(p => {
+    if (p === "granted") loadNearby();
+    else { status = p === "denied" ? "denied" : "off"; render(); }
+  });
 }
 
 /* ---------- My timeline ---------- */
