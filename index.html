@@ -191,6 +191,16 @@ svg { display: block; }
   transition: transform .12s ease, opacity .12s ease;
 }
 .btn-primary:active { transform: scale(.98); opacity: .92; }
+.btn-secondary {
+  display: flex; align-items: center; justify-content: center; width: 100%;
+  min-height: var(--button-h); padding: 12px; border-radius: var(--radius-lg);
+  background: var(--white); color: var(--navy); border: 1.5px solid var(--navy);
+  font: var(--t-button); transition: transform .12s ease;
+}
+.btn-secondary:active { transform: scale(.98); }
+.btn-secondary[hidden] { display: none; }
+.onb-btns { display: flex; gap: 46px; }
+.onb-btns > * { flex: 1; min-width: 0; }
 
 .footer {
   flex: none;
@@ -279,7 +289,7 @@ svg { display: block; }
   .copy h2 { font-size: 26px; line-height: 30px; }
   .copy { gap: 12px; }
   .footer.onb-footer { padding-top: var(--s-16); padding-bottom: max(var(--s-16), calc(var(--safe-bottom) + 8px)); }
-  .onb-footer .btn-primary { min-height: 56px; }
+  .onb-footer .btn-primary, .onb-footer .btn-secondary { min-height: 56px; }
 }
 .copy { display: flex; flex-direction: column; gap: var(--s-16); max-width: 337px; }
 .copy.wide { max-width: none; }
@@ -323,6 +333,7 @@ svg { display: block; }
 
 /* Suggestion cards: native horizontal scroll with snap, cards peek either side */
 .suggest {
+  position: relative;                        /* card offsets measured from the row itself */
   display: flex;
   gap: var(--s-16);
   overflow-x: auto;
@@ -372,6 +383,20 @@ svg { display: block; }
 .s-card.is-selected .btn-select { background: var(--white); color: var(--navy); }
 .s-card.is-selected .btn-select svg { display: block; }
 .s-card-actions { display: flex; align-items: center; gap: var(--s-16); }
+
+/* swipe hint: dots everywhere, arrows only with a mouse */
+.s-pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 2px; }
+.s-dots { display: flex; gap: 8px; }
+.s-dots button { width: 8px; height: 8px; padding: 0; border-radius: 4px; background: #cfcfcf; transition: width .25s ease, background .25s ease; }
+.s-dots button.on { width: 22px; background: var(--navy); }
+.s-arrow { display: none; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--white); box-shadow: var(--elevation-1); color: var(--navy); }
+.s-arrow:disabled { opacity: .35; box-shadow: none; }
+.s-arrow svg { width: 18px; height: 18px; }
+@media (hover: hover) and (pointer: fine) {
+  .s-arrow { display: grid; }
+  .suggest { cursor: grab; }
+  .suggest.dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+}
 
 .or-row {
   display: flex;
@@ -930,6 +955,21 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 }
 .tl > * { flex: none; }
 .tl .home-top { padding: 0; }
+.tl { position: relative; }
+.tip {
+  position: absolute; z-index: 6; width: 268px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 14px 16px 12px; border-radius: var(--radius-lg);
+  background: var(--navy); color: var(--white);
+  box-shadow: 0 6px 20px rgba(1, 43, 79, 0.28);
+  animation: tip-in .25s cubic-bezier(.22,.8,.24,1);
+}
+.tip::before { content: ""; position: absolute; top: -7px; left: calc(var(--arrow, 50%) - 8px); border: 8px solid transparent; border-top: 0; border-bottom: 8px solid var(--navy); }
+.tip.out { opacity: 0; transform: translateY(-4px); transition: opacity .18s, transform .18s; }
+.tip-t { font: 700 16px/20px var(--font-sans); }
+.tip-b { font: 500 14px/19px var(--font-sans); opacity: .9; }
+.tip-ok { align-self: flex-end; margin-top: 6px; padding: 6px 14px; border-radius: var(--radius-pill); background: var(--white); color: var(--navy); font: 700 14px/18px var(--font-sans); }
+@keyframes tip-in { from { opacity: 0; transform: translateY(-6px); } }
 .tl-toggle { align-self: center; display: flex; gap: 9px; padding: 4px; border-radius: var(--radius-pill); background: var(--paper-2); }
 .tl-toggle button { padding: 8px 12px; border-radius: var(--radius-pill); font: 600 16px/18px var(--font-sans); color: var(--navy); white-space: nowrap; }
 .tl-toggle button[aria-checked="true"] { background: var(--navy-soft); color: var(--white); box-shadow: var(--elevation-0); }
@@ -942,20 +982,36 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .circle-btn svg { width: 20px; height: 20px; }
 .circle-btn.sm { width: 32px; height: 32px; }
 .day-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.day-row { display: flex; align-items: center; gap: var(--s-8); }
+.day-nav { display: flex; align-items: center; gap: 2px; }
+.day-row { display: flex; align-items: center; gap: var(--s-8); touch-action: pan-y; }
 .day-row button {
-  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
-  background: var(--paper-2); color: #818080; font: 600 14px/18px var(--font-sans);
+  display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--white); color: var(--navy); font: 600 15px/18px var(--font-sans);
+  box-shadow: var(--elevation-0); transition: transform .12s ease;
 }
-.day-row button.on { width: 48px; height: 48px; background: #cfcfcf; color: #002e40; font-size: 18px; }
-.day-row button.future { opacity: .45; }
-.day-pick .mon { font: 600 16px/18px var(--font-serif); }
+.day-row button:active { transform: scale(.94); }
+.day-row button.on { width: 48px; height: 48px; background: var(--navy-soft); color: var(--white); font: 700 18px/20px var(--font-sans); box-shadow: 0 3px 8px rgba(2, 67, 121, .3); }
+.day-row button.future { background: transparent; box-shadow: none; border: 1.5px dashed #c9c9c9; color: #a3a3a3; }
+.day-step { display: grid; place-items: center; width: 28px; height: 40px; color: var(--navy); }
+.day-step svg { width: 18px; height: 18px; }
+.day-step:disabled { opacity: .25; }
+.day-pick .mon { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 600 16px/18px var(--font-serif); }
+.to-today { font: 700 13px/16px var(--font-sans); color: var(--navy); text-decoration: underline; text-underline-offset: 2px; }
+/* "Secondary Button" in Figma */
+.ch-change {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: none; padding: 12px;
+  border-radius: var(--radius-pill); background: var(--paper); box-shadow: var(--elevation-1);
+  font: 600 14px/15px var(--font-sans); color: var(--navy); white-space: nowrap;
+}
+.ch-change svg { width: 16px; height: 16px; stroke-width: 2.5; }
+.ch-change:active { transform: scale(.96); }
+.tl-ch-name h1 { cursor: pointer; }
 
 .tl-chapter { display: flex; flex-direction: column; gap: 12px; }
 .tl-chapter .eyebrow { font: 700 18px/15px var(--font-sans); }
 .tl-ch-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); }
 .tl-ch-name { display: flex; align-items: center; gap: var(--s-8); min-width: 0; }
-.tl-ch-name h1 { font: var(--t-display); line-height: 42px; padding-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-ch-name h1 { font: var(--t-display); line-height: 38px; padding-bottom: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .tl-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font: 600 16px/18px var(--font-sans); color: var(--navy-soft); }
 .tl-meta i, .mc-meta i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 .tl-progress { height: 12px; border-radius: var(--radius-pill); background: var(--paper-2); overflow: hidden; }
@@ -1335,16 +1391,16 @@ const SLIDES = [
   },
   {
     title: "Start a chapter. Get it back when it ends.",
-    body: "Chapters on your timeline help mark different events in your life that may be unfolding. When you close a chapter, the whole thing comes back — every entry, in order, and how many days you marked.",
+    body: "Chapters on your timeline help mark different events in your life that may be unfolding. When you close a chapter, the whole thing comes back — every entry, in order, and how many days you marked in it.",
     wide: true,
   },
   {
-    title: "Write it or say it",
+    title: "Write it or say it.",
     body: "A line of text or a voice note. Most moments take less time than a text message.",
   },
   {
-    title: "You weren’t the only one",
-    body: "Other people were writing down the same ordinary days. You can read what they wrote, on the days you wrote too.",
+    title: "You aren’t the only one recording.",
+    body: "Other people were writing down the same ordinary days. You can read what they wrote on the public timeline, on the days you wrote too.",
   },
 ];
 
@@ -1354,7 +1410,10 @@ const SLIDES = [
 function Onboarding(root) {
   const n = SLIDES.length;
   root.innerHTML = `
-    <div class="brand">${logo}<span>TYWW</span></div>
+    <div class="ch-top">
+      <div class="brand">${logo}<span>TYWW</span></div>
+      <a class="text-link" href="#chapter" id="onb-skip">skip</a>
+    </div>
     <div class="onb-body" id="onb-body">
       <section class="carousel illo-row" aria-roledescription="carousel" aria-label="About The Year We Were">
         <div class="track" data-track>
@@ -1383,7 +1442,10 @@ function Onboarding(root) {
       </div>
     </div>
     <div class="footer onb-footer">
-      <button class="btn-primary" id="onb-continue">Continue</button>
+      <div class="onb-btns">
+        <button class="btn-secondary" id="onb-back">Back</button>
+        <button class="btn-primary" id="onb-next">Next</button>
+      </div>
     </div>`;
 
   const tracks = root.querySelectorAll("[data-track]");
@@ -1399,7 +1461,12 @@ function Onboarding(root) {
       [...t.children].forEach((s, k) => s.setAttribute("aria-hidden", k !== i));
     });
     segs.forEach((s, k) => k === i ? s.setAttribute("aria-current", "step") : s.removeAttribute("aria-current"));
+    /* footer: Next alone on the first slide, Back + Next in the middle, one big button at the end */
+    const last = i === n - 1;
+    backBtn.hidden = i === 0 || last;
+    nextBtn.textContent = last ? "Start your first chapter" : "Next";
   }
+  const backBtn = root.querySelector("#onb-back"), nextBtn = root.querySelector("#onb-next");
   function go(i) {
     state.onboardingIndex = Math.max(0, Math.min(n - 1, i));
     dx = 0;
@@ -1443,7 +1510,11 @@ function Onboarding(root) {
   body.addEventListener("pointercancel", () => { tracking = false; dx = 0; render(true); });
 
   segs.forEach(s => s.addEventListener("click", () => go(+s.dataset.go)));
-  root.querySelector("#onb-continue").addEventListener("click", () => { location.hash = "#chapter"; });
+  nextBtn.addEventListener("click", () => {
+    if (state.onboardingIndex === n - 1) location.hash = "#chapter";
+    else go(state.onboardingIndex + 1);
+  });
+  backBtn.addEventListener("click", () => go(state.onboardingIndex - 1));
 
   const onKey = e => {
     if (e.key === "ArrowRight") go(state.onboardingIndex + 1);
@@ -1519,11 +1590,17 @@ function ChapterSetup(root) {
           </article>`).join("")}
       </div>
 
+      <div class="s-pager" aria-label="Suggested chapters">
+        <button class="s-arrow" id="s-prev" aria-label="Previous suggestion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="s-dots">${SUGGESTIONS.map((s, i) => `<button data-dot="${i}" aria-label="Show ${s.name}"></button>`).join("")}</div>
+        <button class="s-arrow" id="s-next" aria-label="Next suggestion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+
       <div class="or-row"><span>Or</span>${ICON.scribbleArrow}</div>
 
       <form class="form-card" id="ch-form" novalidate>
         <div class="field" id="name-field">
-          <label for="ch-name">Write your own</label>
+          <label for="ch-name">Write your own chapter name</label>
           <input class="input" id="ch-name" type="text" placeholder="Chapter Name" autocomplete="off" autocapitalize="words" maxlength="40" enterkeyhint="done">
           <p class="field-error" id="name-error" hidden>Give your chapter a name, or pick one above.</p>
         </div>
@@ -1576,6 +1653,66 @@ function ChapterSetup(root) {
     const c = cards[draft.suggestion ?? SUGGEST_START];
     suggest.scrollLeft = c.offsetLeft - (suggest.clientWidth - c.offsetWidth) / 2;
   });
+
+  /* ---- swipe hint: dots + arrows follow the centred card ---- */
+  const dots = [...root.querySelectorAll("[data-dot]")];
+  const prev = root.querySelector("#s-prev"), next = root.querySelector("#s-next");
+  const centred = () => {
+    const mid = suggest.scrollLeft + suggest.clientWidth / 2;
+    let best = 0, bd = Infinity;
+    cards.forEach((c, i) => { const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid); if (d < bd) { bd = d; best = i; } });
+    return best;
+  };
+  const goTo = i => {
+    const c = cards[Math.max(0, Math.min(cards.length - 1, i))];
+    suggest.scrollTo({ left: c.offsetLeft - (suggest.clientWidth - c.offsetWidth) / 2, behavior: "smooth" });
+  };
+  const paintPager = () => {
+    const i = centred();
+    dots.forEach((d, j) => { d.classList.toggle("on", j === i); d.setAttribute("aria-current", j === i ? "true" : "false"); });
+    prev.disabled = i === 0; next.disabled = i === cards.length - 1;
+  };
+  suggest.addEventListener("scroll", paintPager, { passive: true });
+  prev.addEventListener("click", () => goTo(centred() - 1));
+  next.addEventListener("click", () => goTo(centred() + 1));
+  dots.forEach((d, i) => d.addEventListener("click", () => goTo(i)));
+  setTimeout(paintPager, 0); requestAnimationFrame(() => requestAnimationFrame(paintPager));
+
+  /* with a mouse: click and drag the cards sideways */
+  let drag = null;
+  suggest.addEventListener("pointerdown", e => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    drag = { x: e.clientX, left: suggest.scrollLeft, moved: false };
+  });
+  window.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) > 5) { drag.moved = true; suggest.classList.add("dragging"); }
+    if (drag.moved) suggest.scrollLeft = drag.left - dx;
+  });
+  window.addEventListener("pointerup", () => {
+    if (!drag) return;
+    const was = drag.moved; drag = null;
+    if (!was) return;
+    suggest.classList.remove("dragging");
+    goTo(centred());
+    suggest.addEventListener("click", e => { e.stopPropagation(); e.preventDefault(); }, { capture: true, once: true });
+  });
+
+  /* first visit: the cards slide a little and back, so it's clear they move */
+  if (!state.swipeHinted) {
+    state.swipeHinted = true;
+    setTimeout(() => {
+      if (!suggest.isConnected) return;
+      const home = suggest.scrollLeft;
+      suggest.style.scrollSnapType = "none";
+      suggest.scrollTo({ left: home + 70, behavior: "smooth" });
+      setTimeout(() => {
+        suggest.scrollTo({ left: home, behavior: "smooth" });
+        setTimeout(() => { suggest.style.scrollSnapType = ""; }, 450);
+      }, 480);
+    }, 700);
+  }
 
   /* Select → pre-fill the name and bring the form card into view */
   suggest.addEventListener("click", e => {
@@ -1750,6 +1887,9 @@ function openDatePicker({ title, value, min, max, onDone }) {
    Set it with ?name=Anna in the link, or on the Settings tab. */
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 state.userName = (new URLSearchParams(location.search).get("name") || "").trim();
+/* one-time timeline tips; facilitator can switch them off in Settings or with ?tips=off */
+state.tips = new URLSearchParams(location.search).get("tips") !== "off";
+state.tipsSeen = new Set();
 
 /* ---------- Chapter themes: tailored prompt + public-timeline examples ---------- */
 const THEMES = [
@@ -2960,7 +3100,14 @@ function MyTimeline(root) {
       </div>
       <div class="tl-dates">
         <button class="circle-btn" id="tl-cal" aria-label="Pick a day">${SVG.calDue}</button>
-        <div class="day-pick"><div class="day-row" id="tl-days"></div><span class="mon" id="tl-mon"></span></div>
+        <div class="day-pick">
+          <div class="day-nav">
+            <button class="day-step" id="day-prev" aria-label="Previous day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="day-row" id="tl-days"></div>
+            <button class="day-step" id="day-next" aria-label="Next day"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+          </div>
+          <span class="mon" id="tl-mon"></span>
+        </div>
         <button class="circle-btn" id="tl-search" aria-label="Search">${SVG.search}</button>
       </div>
       <section class="tl-chapter" id="tl-chapter"></section>
@@ -2981,7 +3128,14 @@ function MyTimeline(root) {
     const days = [-1, 0, 1].map(o => new Date(d.getFullYear(), d.getMonth(), d.getDate() + o));
     $("#tl-days").innerHTML = days.map((x, i) =>
       `<button class="${i === 1 ? "on" : ""} ${x > today ? "future" : ""}" data-day="${x.getTime()}" aria-label="${fmtDate(x)}${x > today ? " (not yet)" : ""}" ${x > today ? "disabled" : ""} ${i === 1 ? 'aria-current="date"' : ""}>${x.getDate()}</button>`).join("");
-    $("#tl-mon").textContent = MONTHS[d.getMonth()].slice(0, 3);
+    const isToday = sameDay(d, today);
+    $("#tl-mon").innerHTML = `<span>${MONTHS[d.getMonth()].slice(0, 3)}</span>${isToday ? "" : `<button class="to-today" id="to-today">Back to today</button>`}`;
+    $("#day-next").disabled = isToday;
+  }
+  function stepDay(n) {
+    const d = state.timelineDay, x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+    if (x > today) return;
+    state.timelineDay = x; renderDays(); renderStream();
   }
 
   function renderChapter() {
@@ -3007,13 +3161,14 @@ function MyTimeline(root) {
       <div class="tl-ch-row">
         <div class="tl-ch-name">
           <h1>${esc(info.name)}</h1>
-          <button class="circle-btn sm" id="tl-switch" aria-label="Switch chapter" aria-haspopup="dialog">${SVG.chevDownSm}</button>
+          <button class="ch-change" id="tl-switch" aria-label="Change chapter" aria-haspopup="dialog">Change ${SVG.chevDownSm}</button>
         </div>
         <button class="circle-btn sm" id="tl-more" aria-label="Chapter options">${SVG.dots}</button>
       </div>
       <div class="tl-meta">${meta}</div>
       ${bar}${day}`;
     $("#tl-switch").addEventListener("click", () => openChapterSwitcher(() => { renderChapter(); renderStream(); }));
+    root.querySelector(".tl-ch-name h1").addEventListener("click", () => $("#tl-switch").click());
     $("#tl-more").addEventListener("click", e => {
       e.stopPropagation();
       if (!info.chapter) return toast("Pick a chapter to see its options");
@@ -3266,7 +3421,21 @@ function MyTimeline(root) {
     const b = e.target.closest("[data-mode]");
     if (b) { state.timelineMode = b.dataset.mode; state.publicShown = PAGE; renderChapter(); renderStream(); }
   });
+  $("#day-prev").addEventListener("click", () => stepDay(-1));
+  $("#day-next").addEventListener("click", () => stepDay(1));
+  $("#tl-mon").addEventListener("click", e => {
+    if (e.target.closest("#to-today")) { state.timelineDay = today; renderDays(); renderStream(); }
+  });
+  /* swipe the day row left / right to move a day */
+  let sw = null;
+  $("#tl-days").addEventListener("pointerdown", e => { sw = { x: e.clientX, y: e.clientY }; });
+  $("#tl-days").addEventListener("pointerup", e => {
+    if (!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
+    if (Math.abs(dx) > 30 && Math.abs(dx) > Math.abs(dy)) { stepDay(dx < 0 ? 1 : -1); $("#tl-days").dataset.swiped = "1"; setTimeout(() => { delete $("#tl-days").dataset.swiped; }, 80); }
+  });
   $("#tl-days").addEventListener("click", e => {
+    if ($("#tl-days").dataset.swiped) { delete $("#tl-days").dataset.swiped; return; }
     const b = e.target.closest("[data-day]");
     if (!b) return;
     state.timelineDay = new Date(+b.dataset.day);
@@ -3335,9 +3504,40 @@ function MyTimeline(root) {
 
   renderDays(); renderChapter(); renderStream();
 
+  /* ---- one-time tips: a small bubble pointing at the thing, shown once, easy to dismiss ---- */
+  let tipTimer = 0;
+  function showTip() {
+    if (!state.tips || state.timelineMode !== "mine" || root.querySelector(".tip")) return;
+    let id, target, title, body;
+    if (!state.tipsSeen.has("toggle") && state.moments.length) {
+      id = "toggle"; target = root.querySelector(".tl-toggle");
+      title = "See what other people captured today";
+      body = "Switch to Public Timeline, or Both to see yours side by side.";
+    } else if (!state.tipsSeen.has("chapters") && state.chapters.length >= 2 && $("#tl-switch")) {
+      id = "chapters"; target = $("#tl-switch");
+      title = "Switch between your chapters";
+      body = "Tap here to see a different chapter, or start a new one.";
+    } else return;
+    state.tipsSeen.add(id);
+    const tl = $("#tl"), t = target.getBoundingClientRect(), box = tl.getBoundingClientRect();
+    const tip = document.createElement("div");
+    tip.className = "tip"; tip.setAttribute("role", "status");
+    tip.innerHTML = `<p class="tip-t">${title}</p><p class="tip-b">${body}</p><button class="tip-ok">Got it</button>`;
+    tl.appendChild(tip);
+    const pointX = t.left + t.width / 2 - box.left;                       // where the arrow points
+    const w = tip.offsetWidth, left = Math.max(8, Math.min(box.width - w - 8, pointX - w / 2));
+    tip.style.left = `${left}px`;
+    tip.style.top = `${t.bottom - box.top + tl.scrollTop + 12}px`;
+    tip.style.setProperty("--arrow", `${pointX - left}px`);
+    const close = () => { tip.classList.add("out"); setTimeout(() => tip.remove(), 180); target.removeEventListener("click", close); };
+    tip.querySelector(".tip-ok").addEventListener("click", close);
+    target.addEventListener("click", close);                               // using the thing also dismisses it
+  }
+  tipTimer = setTimeout(showTip, 700);
+
   /* snackbar after "Add Moment" */
   if (state.pendingSnack) { showSnack(state.pendingSnack); state.pendingSnack = null; }
-  return () => { stop(); closeBigSheet(); hideSnack(true); if (io) io.disconnect(); };
+  return () => { clearTimeout(tipTimer); stop(); closeBigSheet(); hideSnack(true); if (io) io.disconnect(); };
 }
 
 /* Snackbar: sits 12px above the nav bar, auto-dismisses after 5s, Undo removes the moment */
@@ -3689,6 +3889,10 @@ function Settings(root) {
         <p class="hint">Tip: you can also set it in the link before a session, e.g. <code>…/index.html?name=Anna</code></p>
       </form>
       <div class="form-card">
+        <div class="public-row"><span id="tips-label">Show tips on the timeline</span><button class="switch" id="tips-switch" role="switch" aria-labelledby="tips-label" aria-checked="${state.tips}"></button></div>
+        <p class="hint">One-time hints for the view toggle and the chapter switcher. Turn off to see whether people find things on their own. You can also add <code>?tips=off</code> to the link.</p>
+      </div>
+      <div class="form-card">
         <p class="hint">Starting a new test session? This clears the chapter and goes back to the first onboarding screen (the name is kept).</p>
         <button class="btn-primary" id="restart" type="button">Restart prototype</button>
       </div>
@@ -3706,8 +3910,17 @@ function Settings(root) {
     note.hidden = false;
     root.querySelector("#tester-name").blur();
   });
+  root.querySelector("#tips-switch").addEventListener("click", e => {
+    state.tips = !state.tips;
+    e.currentTarget.setAttribute("aria-checked", state.tips);
+    if (state.tips) state.tipsSeen.clear();                    // turning tips back on shows them again
+    const url = new URL(location.href);
+    state.tips ? url.searchParams.delete("tips") : url.searchParams.set("tips", "off");
+    history.replaceState(null, "", url);
+  });
   root.querySelector("#restart").addEventListener("click", () => {
     state.onboardingIndex = 0;
+    state.tipsSeen.clear();
     state.chapter = null;
     state.chapters = [];
     state.captureChapterId = null;
