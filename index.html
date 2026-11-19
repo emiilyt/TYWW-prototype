@@ -665,6 +665,14 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
   gap: 32px;
   padding: var(--s-24) var(--gutter);
 }
+/* Add Moment stays pinned at the bottom while the form scrolls above it */
+.cap-foot {
+  flex: none;
+  padding: 12px var(--gutter) max(var(--s-16), calc(var(--safe-bottom) + 8px));
+  background: var(--paper);
+  box-shadow: 0 -8px 16px -8px rgba(36, 31, 26, 0.12);
+  position: relative; z-index: 2;
+}
 .cap > * { flex: none; }
 .cap .home-top { padding: 0; }
 .cap-row { display: flex; align-items: flex-start; justify-content: space-between; }
@@ -2169,6 +2177,8 @@ function Capture(root) {
           <p class="seg-hint" id="seg-hint"></p>
         </div>
       </div>
+    </div>
+    <div class="cap-foot">
       <button class="btn-primary" id="cap-add">Add Moment</button>
     </div>`;
 
@@ -3951,7 +3961,7 @@ const ROUTES = {
   "timeline":        { view: Timeline, tabs: true },
   "moment":          { view: MomentView, tabs: true, tab: "timeline" },
   "pub":             { view: PublicMomentView, tabs: true, tab: "timeline" },
-  "capture":         { view: Capture, tabs: true },
+  "capture":         { view: Capture, tabs: false },
   "predictions":     { view: Placeholder("Predictions", "Not built yet."), tabs: true },
   "saved":           { view: Placeholder("Saved", "Moments you bookmark from the public timeline will live here. Not built yet."), tabs: true },
   "menu":            { view: Placeholder("Menu", "Not built yet."), tabs: true },
