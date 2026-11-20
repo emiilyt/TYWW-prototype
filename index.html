@@ -1022,6 +1022,17 @@ input.input::placeholder { color: var(--navy); opacity: .45; }
 .tl-ch-name h1 { font: var(--t-display); line-height: 38px; padding-bottom: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .tl-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font: 600 16px/18px var(--font-sans); color: var(--navy-soft); }
 .tl-meta i, .mc-meta i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.ch-dates { display: block; font: 500 15px/20px var(--font-sans); color: var(--navy-soft); margin-bottom: -4px; }
+.ch-dates b { font-weight: 700; }
+.ch-dates i { display: inline-block; vertical-align: middle; margin: -2px 4px 0; width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex: none; }
+.tl-chapter .tl-meta { font: 500 15px/20px var(--font-sans); }
+.tl-eyerow { display: flex; align-items: center; gap: 8px; }
+.ch-status { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px 4px 8px; border-radius: var(--radius-pill); font: 700 12px/14px var(--font-sans); letter-spacing: .02em; }
+.ch-status.open { background: rgba(169, 211, 174, .45); color: #1f5a2a; }
+.ch-status.open::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #2f8a3e; }
+.ch-status.closed { background: var(--track); color: var(--olive-ink); }
+.ch-status svg { width: 12px; height: 12px; }
+.tl-chapter.is-closed .tl-progress span { filter: grayscale(1); opacity: .55; }
 .tl-progress { height: 12px; border-radius: var(--radius-pill); background: var(--paper-2); overflow: hidden; }
 .tl-progress span { display: block; height: 100%; border-radius: var(--radius-pill); min-width: 12px; }
 .tl-day { font: 600 16px/18px var(--font-sans); color: var(--navy-soft); }
@@ -1399,12 +1410,13 @@ const SLIDES = [
   },
   {
     title: "Start a chapter. Get it back when it ends.",
-    body: "Chapters on your timeline help mark different events in your life that may be unfolding. When you close a chapter, the whole thing comes back — every entry, in order, and how many days you marked in it.",
+    body: "A chapter is a stretch of your life: a few weeks, a season or a whole year. A new job, a winter, a trip. When it ends, the whole chapter comes back to you.",
     wide: true,
   },
   {
-    title: "Write it or say it.",
-    body: "A line of text or a voice note. Most moments take less time than a text message.",
+    title: "Fill it with moments.",
+    body: "A moment is one small thing: a line of text or a voice note. Add as many as you like to your chapter. Most take less time than a text message.",
+    wide: true,
   },
   {
     title: "You aren’t the only one recording.",
@@ -2012,7 +2024,10 @@ function TimelineWelcome(root) {
   let dayLine = "Let’s capture your first moment and start your timeline.";
   if (c) {
     const day = Math.round((today - startOfDay(c.start)) / 864e5) + 1;
-    dayLine = day >= 1
+    const ended = c.end && startOfDay(c.end) < today;           // set up entirely in the past
+    dayLine = ended
+      ? `Let’s add a moment to your<br>new chapter: <b>${esc(c.name)}</b>`
+      : day >= 1
       ? `Day ${day} of <b>${esc(c.name)}</b>`
       : `<b>${esc(c.name)}</b> starts ${fmtDate(c.start)}`;
   }
@@ -2587,13 +2602,18 @@ function Capture(root) {
       if (!state.chapter) state.chapter = c;
       state.captureChapterId = c.id;
     }
-    const m = { ...d, id: Date.now(), chapterId: c ? c.id : null, date: new Date() };
+    const now = new Date();
+    const past = c && c.end && startOfDay(c.end) < startOfDay(now);   // chapter already over: file it on its last day
+    const date = past ? new Date(c.end.getFullYear(), c.end.getMonth(), c.end.getDate(), now.getHours(), now.getMinutes()) : now;
+    const m = { ...d, id: Date.now(), chapterId: c ? c.id : null, date };
     state.moments.push(m);
     state.momentDraft = null;
     state.timelineView = c ? c.id : "none";             // open the timeline on this moment's chapter
-    state.timelineDay = startOfDay(new Date());
+    state.timelineDay = startOfDay(date);
     state.timelineMode = "mine";
-    state.pendingSnack = { momentId: m.id, first: state.moments.length === 1, chapterName: c ? c.name : null };
+    state.pendingSnack = { momentId: m.id, first: state.moments.length === 1, chapterName: c ? c.name : null, date };
+    state.pastHint = past ? { day: startOfDay(date), name: c.name } : null;
+    state.leavePast = past;                             // "Back to today" then drops them into Day to day
     location.hash = "#timeline";
   });
 
@@ -3154,12 +3174,14 @@ function MyTimeline(root) {
     if (state.timelineMode === "public") return renderPublicHead();
     const info = viewInfo();
     const ms = momentsIn(state.timelineView);
-    let meta, day = "", bar = "";
+    let meta, day = "", bar = "", dates = "", status = "";
     if (info.chapter) {
       const c = info.chapter, p = chapterProgress(c);
-      meta = `<span>${ordOf(c.start)}${c.end ? ` to ${ordOf(c.end)}` : " · open"}${isClosed(c) ? " · closed" : ""}</span><i></i><span>${plural(ms.length, "moment")}</span>`;
+      const short = c.name.replace(/^(this|my|the)\s+/i, "");
+      dates = `<div class="ch-dates"><span><b>Start date:</b> ${ordOf(c.start)}</span><i></i><span><b>End date:</b> ${c.end ? ordOf(c.end) : "No end date"}</span></div>`;
+      meta = `<span>${isClosed(c) ? `${plural(p.total || p.day, "day")} covered` : `Day ${p.day} of ${esc(short)}`}</span><i></i><span>${plural(ms.length, "moment")} captured</span>`;
+      status = isClosed(c) ? `<span class="ch-status closed">${SVG.lockSm} Closed</span>` : `<span class="ch-status open">Open</span>`;
       bar = `<div class="tl-progress" role="progressbar" aria-valuenow="${Math.round(p.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="Chapter progress"><span style="width:${p.pct}%; background:${info.colour}"></span></div>`;
-      day = `<p class="tl-day">${p.total ? `Day ${p.day} of ${p.total}` : `Day ${p.day}`}</p>`;
     } else if (state.timelineView === "none") {
       meta = `<span>Moments you kept without a chapter</span><i></i><span>${plural(ms.length, "moment")}</span>`;
       day = `<p class="tl-sub">No end date. They stay here until you add them to a chapter.</p>`;
@@ -3167,7 +3189,7 @@ function MyTimeline(root) {
       meta = `<span>All chapters and Day to day</span><i></i><span>${plural(ms.length, "moment")}</span>`;
     }
     $("#tl-chapter").innerHTML = `
-      <p class="eyebrow">${info.chapter ? "Chapter" : state.timelineView === "none" ? "Not in a chapter" : "Viewing"}</p>
+      <div class="tl-eyerow"><p class="eyebrow">${info.chapter ? "Chapter" : state.timelineView === "none" ? "Not in a chapter" : "Viewing"}</p>${status}</div>
       <div class="tl-ch-row">
         <div class="tl-ch-name">
           <h1>${esc(info.name)}</h1>
@@ -3175,8 +3197,9 @@ function MyTimeline(root) {
         </div>
         <button class="circle-btn sm" id="tl-more" aria-label="Chapter options">${SVG.dots}</button>
       </div>
-      <div class="tl-meta">${meta}</div>
+      ${dates}<div class="tl-meta">${meta}</div>
       ${bar}${day}`;
+    $("#tl-chapter").classList.toggle("is-closed", !!(info.chapter && isClosed(info.chapter)));
     $("#tl-switch").addEventListener("click", () => openChapterSwitcher(() => { renderChapter(); renderStream(); }));
     root.querySelector(".tl-ch-name h1").addEventListener("click", () => $("#tl-switch").click());
     $("#tl-more").addEventListener("click", e => {
@@ -3434,7 +3457,15 @@ function MyTimeline(root) {
   $("#day-prev").addEventListener("click", () => stepDay(-1));
   $("#day-next").addEventListener("click", () => stepDay(1));
   $("#tl-mon").addEventListener("click", e => {
-    if (e.target.closest("#to-today")) { state.timelineDay = today; renderDays(); renderStream(); }
+    if (e.target.closest("#to-today")) {
+      state.timelineDay = today;
+      if (state.leavePast) {                            // came from a chapter that's already over: don't land back on it
+        state.leavePast = false;
+        state.timelineView = "none"; state.captureChapterId = null;
+        renderChapter();
+      }
+      renderDays(); renderStream();
+    }
   });
   /* swipe the day row left / right to move a day */
   let sw = null;
@@ -3517,18 +3548,24 @@ function MyTimeline(root) {
   /* ---- one-time tips: a small bubble pointing at the thing, shown once, easy to dismiss ---- */
   let tipTimer = 0;
   function showTip() {
-    if (!state.tips || state.timelineMode !== "mine" || root.querySelector(".tip")) return;
+    if (state.timelineMode !== "mine" || root.querySelector(".tip")) return;
     let id, target, title, body;
-    if (!state.tipsSeen.has("toggle") && state.moments.length) {
+    const ph = state.pastHint;
+    if (ph && $("#to-today") && sameDay(state.timelineDay, ph.day)) {
+      state.pastHint = null;
+      target = $("#to-today");
+      title = `Added to ${ordOf(ph.day)}`;
+      body = `That’s when the chapter: <b>${esc(ph.name)}</b> ended. Go back to today to add today’s moments.`;
+    } else if (state.tips && !state.tipsSeen.has("toggle") && state.moments.length) {
       id = "toggle"; target = root.querySelector(".tl-toggle");
       title = "See what other people captured today";
       body = "Switch to Public Timeline, or Both to see yours side by side.";
-    } else if (!state.tipsSeen.has("chapters") && state.chapters.length >= 2 && $("#tl-switch")) {
+    } else if (state.tips && !state.tipsSeen.has("chapters") && state.chapters.length >= 2 && $("#tl-switch")) {
       id = "chapters"; target = $("#tl-switch");
       title = "Switch between your chapters";
       body = "Tap here to see a different chapter, or start a new one.";
     } else return;
-    state.tipsSeen.add(id);
+    if (id) state.tipsSeen.add(id);
     const tl = $("#tl"), t = target.getBoundingClientRect(), box = tl.getBoundingClientRect();
     const tip = document.createElement("div");
     tip.className = "tip"; tip.setAttribute("role", "status");
@@ -3552,9 +3589,9 @@ function MyTimeline(root) {
 
 /* Snackbar: sits 12px above the nav bar, auto-dismisses after 5s, Undo removes the moment */
 let snackTimer = null;
-function showSnack({ momentId, first, chapterName }) {
+function showSnack({ momentId, first, chapterName, date }) {
   hideSnack(true);
-  const when = shortDay(new Date());
+  const when = shortDay(date || new Date());
   const el = document.createElement("div");
   el.className = "snack";
   el.setAttribute("role", "status");
@@ -3563,7 +3600,7 @@ function showSnack({ momentId, first, chapterName }) {
     <span class="txt">
       <b>${first ? "Your first moment is saved" : "Moment saved"}</b>
       <span>${first
-        ? (chapterName ? `It’s on ${esc(chapterName)}’s timeline. When the chapter ends, it comes back with the rest.` : "It’s on your timeline under Day to day.")
+        ? (chapterName ? (date && !sameDay(date, new Date()) ? `It’s on ${esc(chapterName)}’s timeline, on ${ordOf(date)}.` : `It’s on ${esc(chapterName)}’s timeline. When the chapter ends, it comes back with the rest.`) : "It’s on your timeline under Day to day.")
         : `Added to ${chapterName ? esc(chapterName) : "Day to day"} · ${when}`}</span>
     </span>
     <button type="button">Undo</button>`;
